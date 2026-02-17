@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id               Int        @id @default(autoincrement())
+  name             String
+  category         String
+  price            Float
+  description      String
+  ingredients      String
+  nutritional_info String
+  origin_info      String
+  certifications   String
+  allergen_free    String
+  image_emoji      String
+  image_url        String     @default("")
+  color_from       String
+  color_to         String
+  is_vegan         Boolean    @default(false)
+  is_vegetarian    Boolean    @default(false)
+  created_at       DateTime   @default(now())
+  purchases        Purchase[]
+  events           Event[]
+}
+
+model Participant {
+  id             Int       @id @default(autoincrement())
+  name           String?
+  age_range      String
+  gender         String
+  allergies      String
+  dietary_prefs  String
+  vending_freq   String
+  would_seek     String
+  created_at     DateTime  @default(now())
+  sessions       Session[]
+}
+
+model Session {
+  id              Int        @id @default(autoincrement())
+  participant_id  Int
+  participant     Participant @relation(fields: [participant_id], references: [id])
+  budget_set      Float
+  total_spent     Float      @default(0)
+  items_purchased Int        @default(0)
+  session_start   DateTime   @default(now())
+  session_end     DateTime?
+  feedback_realism    Int?
+  feedback_would_use  String?
+  feedback_comment    String?
+  completed       Boolean    @default(false)
+  purchases       Purchase[]
+  events          Event[]
+}
+
+model Purchase {
+  id         Int      @id @default(autoincrement())
+  session_id Int
+  session    Session  @relation(fields: [session_id], references: [id])
+  product_id Int
+  product    Product  @relation(fields: [product_id], references: [id])
+  quantity   Int
+  unit_price Float
+  total_price Float
+  created_at DateTime @default(now())
+}
+
+model Event {
+  id         Int      @id @default(autoincrement())
+  session_id Int
+  session    Session  @relation(fields: [session_id], references: [id])
+  event_type String
+  product_id Int?
+  product    Product? @relation(fields: [product_id], references: [id])
+  category   String?
+  metadata   String?
+  timestamp  DateTime @default(now())
+}

@@ -13,8 +13,8 @@ export async function POST(request: NextRequest) {
           gender: body.gender || "non renseigné",
           allergies: JSON.stringify(body.allergies || []),
           dietary_prefs: JSON.stringify(body.dietary_prefs || []),
-          vending_freq: body.vending_freq || null,
-          would_seek: body.would_seek || null,
+          vending_freq: body.vending_freq || "non renseigné",
+          would_seek: body.would_seek || "non renseigné",
         },
       });
 

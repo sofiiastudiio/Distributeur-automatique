@@ -14,6 +14,7 @@ export default function OnboardingPage() {
   const setSession = useSessionStore((s) => s.setSession);
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   const [form, setForm] = useState({
     age_range: "",
@@ -27,17 +28,22 @@ export default function OnboardingPage() {
   const handleSubmit = async () => {
     if (submitting) return;
     setSubmitting(true);
+    setError("");
     try {
       const res = await fetch("/api/participants", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      if (!res.ok) throw new Error("API error");
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Erreur ${res.status}: ${text || res.statusText}`);
+      }
       const data = await res.json();
       setSession(data.session_id, data.participant_id);
       router.push("/machine");
-    } catch {
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur de connexion");
       setSubmitting(false);
     }
   };
@@ -139,6 +145,13 @@ export default function OnboardingPage() {
             </div>
           )}
         </div>
+
+        {/* Error message */}
+        {error && (
+          <div className="mt-3 shrink-0 rounded-xl bg-red-50 px-4 py-2 text-sm text-red-600">
+            {error}
+          </div>
+        )}
 
         {/* Fixed bottom buttons */}
         <div className="mt-4 shrink-0">

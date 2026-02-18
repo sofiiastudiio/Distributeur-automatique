@@ -25,6 +25,7 @@ export default function OnboardingPage() {
     arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val];
 
   const handleSubmit = async () => {
+    if (submitting) return;
     setSubmitting(true);
     try {
       const res = await fetch("/api/participants", {
@@ -32,22 +33,7 @@ export default function OnboardingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const data = await res.json();
-      setSession(data.session_id, data.participant_id);
-      router.push("/machine");
-    } catch {
-      setSubmitting(false);
-    }
-  };
-
-  const handleSkip = async () => {
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/participants", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
+      if (!res.ok) throw new Error("API error");
       const data = await res.json();
       setSession(data.session_id, data.participant_id);
       router.push("/machine");
@@ -153,47 +139,47 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        <div className="mt-8 flex items-center justify-between">
-          {step > 0 ? (
-            <button
-              onClick={() => setStep(step - 1)}
-              className="rounded-xl bg-surface px-6 py-3 font-medium text-foreground/70 transition-colors hover:bg-surface-light"
-            >
-              Retour
-            </button>
-          ) : (
-            <button
-              onClick={handleSkip}
-              disabled={submitting}
-              className="text-sm font-medium text-foreground/40 transition-colors hover:text-foreground/60"
-            >
-              Passer
-            </button>
-          )}
-
-          {step < 1 ? (
-            <button
-              onClick={() => setStep(step + 1)}
-              className="rounded-xl bg-primary px-8 py-3 font-semibold text-white transition-all hover:bg-primary-light active:scale-95"
-            >
-              Suivant
-            </button>
-          ) : (
-            <div className="flex items-center gap-4">
+        <div className="mt-8">
+          {step === 0 ? (
+            <div className="flex items-center justify-between">
               <button
-                onClick={handleSkip}
+                onClick={handleSubmit}
                 disabled={submitting}
-                className="text-sm font-medium text-foreground/40 transition-colors hover:text-foreground/60"
+                className="rounded-xl px-5 py-3 text-sm font-medium text-foreground/50 transition-colors hover:bg-surface-light active:scale-95"
               >
                 Passer
               </button>
               <button
+                onClick={() => setStep(step + 1)}
+                className="rounded-xl bg-primary px-8 py-3 font-semibold text-white transition-all hover:bg-primary-light active:scale-95"
+              >
+                Suivant
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <button
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="rounded-xl bg-accent px-8 py-3 font-semibold text-background transition-all hover:bg-accent-light active:scale-95 disabled:opacity-40"
+                className="w-full rounded-xl bg-accent px-8 py-4 font-semibold text-background transition-all hover:bg-accent-light active:scale-95 disabled:opacity-40"
               >
                 {submitting ? "Chargement..." : "Accéder au distributeur"}
               </button>
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => setStep(step - 1)}
+                  className="rounded-xl bg-surface px-6 py-3 font-medium text-foreground/70 transition-colors hover:bg-surface-light"
+                >
+                  Retour
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="rounded-xl px-5 py-3 text-sm font-medium text-foreground/50 transition-colors hover:bg-surface-light active:scale-95"
+                >
+                  Passer
+                </button>
+              </div>
             </div>
           )}
         </div>

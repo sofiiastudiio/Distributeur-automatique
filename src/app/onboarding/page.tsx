@@ -43,9 +43,9 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center px-4">
-      <div className="glass w-full max-w-lg rounded-3xl p-8">
-        <div className="mb-6 flex justify-center gap-2">
+    <div className="min-h-dvh px-4 py-6 sm:py-10 flex flex-col items-center sm:justify-center">
+      <div className="glass w-full max-w-lg rounded-3xl p-6 sm:p-8">
+        <div className="mb-4 sm:mb-6 flex justify-center gap-2">
           {[0, 1].map((i) => (
             <div
               key={i}
@@ -101,17 +101,17 @@ export default function OnboardingPage() {
         )}
 
         {step === 1 && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             <h2 className="text-2xl font-bold">Allergies</h2>
 
             <div>
               <label className="mb-2 block text-sm text-foreground/60">
                 Avez-vous des allergies alimentaires ?
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                 <button
                   onClick={() => setForm({ ...form, allergies: [] })}
-                  className={`rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
+                  className={`rounded-xl px-3 py-2 sm:px-4 sm:py-3 text-sm font-medium transition-colors ${
                     form.allergies.length === 0
                       ? "bg-primary text-white"
                       : "bg-surface-light text-foreground/70 hover:bg-surface-light/70"
@@ -125,7 +125,7 @@ export default function OnboardingPage() {
                     onClick={() =>
                       setForm({ ...form, allergies: toggleArray(form.allergies, a.id) })
                     }
-                    className={`flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-2 rounded-xl px-3 py-2 sm:px-4 sm:py-3 text-sm font-medium transition-colors ${
                       form.allergies.includes(a.id)
                         ? "bg-primary text-white"
                         : "bg-surface-light text-foreground/70 hover:bg-surface-light/70"
@@ -139,7 +139,7 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        <div className="mt-8">
+        <div className="mt-5 sm:mt-8">
           {step === 0 ? (
             <div className="flex items-center justify-between">
               <button

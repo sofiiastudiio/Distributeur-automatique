@@ -69,7 +69,8 @@ export type EventType =
   | "hesitation"
   | "session_start"
   | "session_end"
-  | "feedback_submit";
+  | "feedback_submit"
+  | "money_insert";
 
 export interface TrackedEvent {
   session_id: number;

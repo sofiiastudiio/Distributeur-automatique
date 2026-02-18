@@ -34,9 +34,9 @@ model Participant {
   age_range      String
   gender         String
   allergies      String
-  dietary_prefs  String
-  vending_freq   String
-  would_seek     String
+  dietary_prefs  String   @default("[]")
+  vending_freq   String?
+  would_seek     String?
   created_at     DateTime  @default(now())
   sessions       Session[]
 }

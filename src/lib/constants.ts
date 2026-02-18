@@ -65,8 +65,18 @@ export const CATEGORY_LABELS: Record<string, string> = {
   drink: "Boissons",
 };
 
-export const BUDGET_MIN = 5;
-export const BUDGET_MAX = 100;
-export const BUDGET_DEFAULT = 30;
+export const DENOMINATIONS = {
+  coins: [
+    { value: 0.5, label: "0.50" },
+    { value: 1, label: "1" },
+    { value: 2, label: "2" },
+    { value: 5, label: "5" },
+  ],
+  bills: [
+    { value: 10, label: "10" },
+    { value: 20, label: "20" },
+    { value: 50, label: "50" },
+  ],
+} as const;
 
 export const AUTO_RESET_SECONDS = 10;

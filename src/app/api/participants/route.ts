@@ -8,19 +8,19 @@ export async function POST(request: NextRequest) {
     const participant = await tx.participant.create({
       data: {
         name: body.name || null,
-        age_range: body.age_range,
-        gender: body.gender,
+        age_range: body.age_range || "non renseigné",
+        gender: body.gender || "non renseigné",
         allergies: JSON.stringify(body.allergies || []),
         dietary_prefs: JSON.stringify(body.dietary_prefs || []),
-        vending_freq: body.vending_freq,
-        would_seek: body.would_seek,
+        vending_freq: body.vending_freq || null,
+        would_seek: body.would_seek || null,
       },
     });
 
     const session = await tx.session.create({
       data: {
         participant_id: participant.id,
-        budget_set: body.budget,
+        budget_set: 0,
       },
     });
 

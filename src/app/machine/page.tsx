@@ -473,7 +473,7 @@ export default function MachinePage() {
                                 src={product.image_url}
                                 alt={product.name}
                                 fill
-                                className={product.image_url.startsWith("/products/") ? "object-contain p-1" : "object-cover"}
+                                className="object-cover"
                                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />

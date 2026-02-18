@@ -43,9 +43,10 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-dvh px-4 py-6 sm:py-10 flex flex-col items-center sm:justify-center">
-      <div className="glass w-full max-w-lg rounded-3xl p-6 sm:p-8">
-        <div className="mb-4 sm:mb-6 flex justify-center gap-2">
+    <div className="flex min-h-dvh flex-col items-center justify-center px-4 py-6 sm:py-10">
+      <div className="glass flex w-full max-w-lg flex-col rounded-3xl p-6 sm:p-8" style={{ maxHeight: "calc(100dvh - 48px)" }}>
+        {/* Progress dots */}
+        <div className="mb-4 sm:mb-6 flex shrink-0 justify-center gap-2">
           {[0, 1].map((i) => (
             <div
               key={i}
@@ -56,62 +57,62 @@ export default function OnboardingPage() {
           ))}
         </div>
 
-        {step === 0 && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold">Vos informations</h2>
+        {/* Scrollable content */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {step === 0 && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold">Vos informations</h2>
 
-            <div>
-              <label className="mb-2 block text-sm text-foreground/60">Tranche d&apos;âge</label>
-              <div className="grid grid-cols-3 gap-2">
-                {AGE_RANGES.map((age) => (
-                  <button
-                    key={age}
-                    onClick={() => setForm({ ...form, age_range: age })}
-                    className={`rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                      form.age_range === age
-                        ? "bg-primary text-white"
-                        : "bg-surface-light text-foreground/70 hover:bg-surface-light/70"
-                    }`}
-                  >
-                    {age}
-                  </button>
-                ))}
+              <div>
+                <label className="mb-2 block text-sm text-foreground/60">Tranche d&apos;âge</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {AGE_RANGES.map((age) => (
+                    <button
+                      key={age}
+                      onClick={() => setForm({ ...form, age_range: age })}
+                      className={`rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
+                        form.age_range === age
+                          ? "bg-primary text-white"
+                          : "bg-surface-light text-foreground/70 hover:bg-surface-light/70"
+                      }`}
+                    >
+                      {age}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-foreground/60">Genre</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {GENDER_OPTIONS.map((g) => (
+                    <button
+                      key={g.value}
+                      onClick={() => setForm({ ...form, gender: g.value })}
+                      className={`rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
+                        form.gender === g.value
+                          ? "bg-primary text-white"
+                          : "bg-surface-light text-foreground/70 hover:bg-surface-light/70"
+                      }`}
+                    >
+                      {g.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
+          )}
 
+          {step === 1 && (
             <div>
-              <label className="mb-2 block text-sm text-foreground/60">Genre</label>
-              <div className="grid grid-cols-2 gap-2">
-                {GENDER_OPTIONS.map((g) => (
-                  <button
-                    key={g.value}
-                    onClick={() => setForm({ ...form, gender: g.value })}
-                    className={`rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                      form.gender === g.value
-                        ? "bg-primary text-white"
-                        : "bg-surface-light text-foreground/70 hover:bg-surface-light/70"
-                    }`}
-                  >
-                    {g.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {step === 1 && (
-          <div className="space-y-4 sm:space-y-6">
-            <h2 className="text-2xl font-bold">Allergies</h2>
-
-            <div>
-              <label className="mb-2 block text-sm text-foreground/60">
+              <h2 className="mb-3 text-2xl font-bold">Allergies</h2>
+              <p className="mb-3 text-sm text-foreground/60">
                 Avez-vous des allergies alimentaires ?
-              </label>
-              <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+              </p>
+              <div className="grid grid-cols-2 gap-1.5">
                 <button
                   onClick={() => setForm({ ...form, allergies: [] })}
-                  className={`rounded-xl px-3 py-2 sm:px-4 sm:py-3 text-sm font-medium transition-colors ${
+                  className={`rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
                     form.allergies.length === 0
                       ? "bg-primary text-white"
                       : "bg-surface-light text-foreground/70 hover:bg-surface-light/70"
@@ -125,7 +126,7 @@ export default function OnboardingPage() {
                     onClick={() =>
                       setForm({ ...form, allergies: toggleArray(form.allergies, a.id) })
                     }
-                    className={`flex items-center gap-2 rounded-xl px-3 py-2 sm:px-4 sm:py-3 text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
                       form.allergies.includes(a.id)
                         ? "bg-primary text-white"
                         : "bg-surface-light text-foreground/70 hover:bg-surface-light/70"
@@ -136,10 +137,11 @@ export default function OnboardingPage() {
                 ))}
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        <div className="mt-5 sm:mt-8">
+        {/* Fixed bottom buttons */}
+        <div className="mt-4 shrink-0">
           {step === 0 ? (
             <div className="flex items-center justify-between">
               <button
@@ -157,25 +159,25 @@ export default function OnboardingPage() {
               </button>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               <button
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="w-full rounded-xl bg-accent px-8 py-4 font-semibold text-background transition-all hover:bg-accent-light active:scale-95 disabled:opacity-40"
+                className="w-full rounded-xl bg-accent px-8 py-3 font-semibold text-background transition-all hover:bg-accent-light active:scale-95 disabled:opacity-40"
               >
                 {submitting ? "Chargement..." : "Accéder au distributeur"}
               </button>
               <div className="flex items-center justify-between">
                 <button
                   onClick={() => setStep(step - 1)}
-                  className="rounded-xl bg-surface px-6 py-3 font-medium text-foreground/70 transition-colors hover:bg-surface-light"
+                  className="rounded-xl px-5 py-2 text-sm font-medium text-foreground/70 transition-colors hover:bg-surface-light"
                 >
                   Retour
                 </button>
                 <button
                   onClick={handleSubmit}
                   disabled={submitting}
-                  className="rounded-xl px-5 py-3 text-sm font-medium text-foreground/50 transition-colors hover:bg-surface-light active:scale-95"
+                  className="rounded-xl px-5 py-2 text-sm font-medium text-foreground/50 transition-colors hover:bg-surface-light active:scale-95"
                 >
                   Passer
                 </button>

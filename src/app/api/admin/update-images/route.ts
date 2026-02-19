@@ -11,6 +11,17 @@ const IMAGE_MAP: Record<string, string> = {
   "Wrap poulet-avocat": "/products/wrap-poulet.png",
   "Poke bowl saumon": "/products/poke-saumon.png",
   "Energy balls cacao-coco": "/products/energy-balls.png",
+  "Chips de légumes": "/products/chips.png",
+  "Barre protéinée vanille": "/products/barre vanille.png",
+  "Crackers sarrasin & romarin": "/products/crakers.png",
+  "Fruits secs & graines": "/products/snack fruits sec.png",
+  "Muffin chocolat sans gluten": "/products/muffin.png",
+  "Smoothie vert détox": "/products/smothie vert détox.png",
+  "Jus d'orange pressé": "/products/jus orange.png",
+  "Lait d'avoine barista": "/products/lait avoine.png",
+  "Kombucha gingembre-citron": "/products/kombucha.png",
+  "Eau minérale Henniez": "/products/henniez.png",
+  "Thé glacé pêche": "/products/thé glacé .png",
 };
 
 export async function POST() {

@@ -468,7 +468,7 @@ export default function MachinePage() {
                             </div>
 
                             {/* Product photo */}
-                            <div className="relative h-36 w-full overflow-hidden bg-slate-50">
+                            <div className="relative h-40 w-full overflow-hidden bg-slate-50">
                               <Image
                                 src={product.image_url}
                                 alt={product.name}

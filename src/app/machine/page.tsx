@@ -468,12 +468,12 @@ export default function MachinePage() {
                             </div>
 
                             {/* Product photo */}
-                            <div className="relative h-44 w-full overflow-hidden bg-slate-50">
+                            <div className="relative h-36 w-full overflow-hidden bg-slate-50">
                               <Image
                                 src={product.image_url}
                                 alt={product.name}
                                 fill
-                                className="object-cover"
+                                className="object-contain p-2"
                                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />

@@ -111,15 +111,21 @@ await sql(`
 console.log("Distributors seeded.");
 
 // Seed stocks (quantity=10) for any missing product × distributor combo
+// Turso HTTP API returns rows as [{type, value}] objects — extract .value
 const productsResult = await sql("SELECT id FROM Product");
-const productIds = (productsResult?.rows ?? []).map((r) => r[0]);
+const productIds = (productsResult?.rows ?? []).map((r) => {
+  const cell = r[0];
+  return cell && typeof cell === "object" && "value" in cell
+    ? Number(cell.value)
+    : Number(cell);
+});
 for (const productId of productIds) {
   for (const distId of ["SAFEBOX-A", "SAFEBOX-B"]) {
     await sql(
       "INSERT OR IGNORE INTO Stock (distributor_id, product_id, quantity) VALUES (?, ?, 10)",
       [
         { type: "text", value: distId },
-        { type: "integer", value: productId },
+        { type: "integer", value: String(productId) },
       ]
     );
   }

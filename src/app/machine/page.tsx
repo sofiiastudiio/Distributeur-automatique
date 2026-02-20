@@ -123,7 +123,7 @@ export default function MachinePage() {
 
   const handleProductClick = (sectionPrefix: string, idx: number, product: Product) => {
     if (dispensing || pendingProduct) return;
-    if ((stockMap[product.id] ?? 0) === 0) return;
+    if (stockMap[product.id] === 0) return;
     const letter = sectionPrefix;
     const num = idx + 1;
     setLcdError(null);
@@ -201,7 +201,7 @@ export default function MachinePage() {
       }, 1500);
       return;
     }
-    if ((stockMap[product.id] ?? 0) === 0) {
+    if (stockMap[product.id] === 0) {
       setLcdError("Épuisé");
       setTimeout(() => { setLcdError(null); setSelectedLetter(null); setSelectedNumber(null); }, 1500);
       return;

@@ -90,10 +90,10 @@ export default function PWAPage() {
   const totalProducts = products.length;
 
   return (
-    <div className="min-h-dvh bg-gradient-to-br from-slate-50 via-white to-teal-50/30 pb-safe">
+    <div className="min-h-dvh bg-gradient-to-br from-slate-50 via-white to-teal-50/30 pb-[env(safe-area-inset-bottom)]">
 
       {/* Header */}
-      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-xl shadow-sm">
+      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-xl shadow-sm pt-[env(safe-area-inset-top)]">
         <div className="h-[3px] bg-gradient-to-r from-cyan-400 via-teal-500 to-emerald-500" />
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -106,10 +106,10 @@ export default function PWAPage() {
             </div>
           </div>
           <div className="text-right">
-            <p className="text-[10px] text-slate-400">
+            <p className="text-xs text-slate-400">
               {availableCount}/{totalProducts} dispo
             </p>
-            <p className="text-[9px] text-slate-300">
+            <p className="text-[10px] text-slate-300">
               {lastRefresh.toLocaleTimeString("fr-CH", { hour: "2-digit", minute: "2-digit" })}
             </p>
           </div>
@@ -184,7 +184,7 @@ export default function PWAPage() {
                             </div>
                           )}
                           {product.is_vegan && (
-                            <div className="absolute top-1.5 right-1.5 rounded-md bg-emerald-500 px-1.5 py-0.5 text-[8px] font-bold text-white">
+                            <div className="absolute top-1.5 right-1.5 rounded-md bg-emerald-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
                               VÉGAN
                             </div>
                           )}
@@ -221,7 +221,7 @@ export default function PWAPage() {
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setSelectedProduct(null)}
           />
-          <div className="relative z-10 w-full max-h-[85dvh] overflow-y-auto rounded-t-3xl bg-white shadow-2xl">
+          <div className="relative z-10 w-full max-h-[85dvh] overflow-y-auto rounded-t-3xl bg-white shadow-2xl pb-[env(safe-area-inset-bottom)]">
             {/* Handle */}
             <div className="sticky top-0 bg-white pt-3 pb-2 px-4 border-b border-slate-100">
               <div className="mx-auto mb-2 h-1 w-12 rounded-full bg-slate-200" />
@@ -229,7 +229,7 @@ export default function PWAPage() {
                 <h2 className="text-base font-bold text-slate-800 pr-4 line-clamp-1">{selectedProduct.name}</h2>
                 <button
                   onClick={() => setSelectedProduct(null)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-400"
+                  className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-400 active:bg-slate-200"
                 >
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

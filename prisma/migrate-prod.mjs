@@ -1,33 +1,54 @@
-// Custom migration script for Turso (production).
-// Prisma's migration engine doesn't support libsql:// URLs directly,
-// so we apply pending migrations manually via @libsql/client.
-import { createClient } from "@libsql/client";
+// Production migration script for Turso.
+// Uses Turso's HTTP API directly (no @libsql/client import issues).
 import { readFileSync, readdirSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { randomUUID } from "crypto";
 
-const url = process.env.TURSO_DATABASE_URL;
+const tursoUrl = process.env.TURSO_DATABASE_URL;
 const authToken = process.env.TURSO_AUTH_TOKEN;
 
-if (!url) {
-  console.log("No TURSO_DATABASE_URL found — skipping production migration (local dev)");
+if (!tursoUrl) {
+  console.log("No TURSO_DATABASE_URL — skipping production migration.");
   process.exit(0);
 }
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const client = createClient({ url, authToken });
+// Convert libsql:// → https:// for Turso HTTP API
+const httpUrl = tursoUrl.replace(/^libsql:\/\//, "https://");
 
-// Ensure tracking table exists
-await client.execute(`
-  CREATE TABLE IF NOT EXISTS _prisma_migrations (
-    id         TEXT PRIMARY KEY,
-    migration_name TEXT NOT NULL UNIQUE,
+async function sql(query, args = []) {
+  const res = await fetch(`${httpUrl}/v2/pipeline`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${authToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      requests: [
+        { type: "execute", stmt: { sql: query, args } },
+        { type: "close" },
+      ],
+    }),
+  });
+
+  const data = await res.json();
+  if (data.results?.[0]?.type === "error") {
+    throw new Error(data.results[0].error.message);
+  }
+  return data.results?.[0]?.response?.result;
+}
+
+// Create migrations tracking table
+await sql(`
+  CREATE TABLE IF NOT EXISTS _applied_migrations (
+    name TEXT PRIMARY KEY,
     applied_at TEXT NOT NULL DEFAULT (datetime('now'))
   )
 `);
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const migrationsDir = join(__dirname, "migrations");
+
 const dirs = readdirSync(migrationsDir)
   .filter((d) => d !== "migration_lock.toml")
   .sort();
@@ -36,30 +57,32 @@ for (const dir of dirs) {
   const sqlFile = join(migrationsDir, dir, "migration.sql");
   if (!existsSync(sqlFile)) continue;
 
-  const { rows } = await client.execute({
-    sql: "SELECT id FROM _prisma_migrations WHERE migration_name = ?",
-    args: [dir],
-  });
-
-  if (rows.length > 0) {
-    console.log(`  skip (already applied): ${dir}`);
+  // Check if already applied
+  const result = await sql(
+    "SELECT name FROM _applied_migrations WHERE name = ?",
+    [{ type: "text", value: dir }]
+  );
+  if (result?.rows?.length > 0) {
+    console.log(`  skip: ${dir}`);
     continue;
   }
 
-  const sql = readFileSync(sqlFile, "utf-8");
-  const statements = sql.split(";").map((s) => s.trim()).filter(Boolean);
+  // Apply migration statement by statement
+  const content = readFileSync(sqlFile, "utf-8");
+  const statements = content
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   for (const stmt of statements) {
-    await client.execute(stmt);
+    await sql(stmt);
   }
 
-  await client.execute({
-    sql: "INSERT INTO _prisma_migrations (id, migration_name) VALUES (?, ?)",
-    args: [randomUUID(), dir],
-  });
+  await sql("INSERT INTO _applied_migrations (name) VALUES (?)", [
+    { type: "text", value: dir },
+  ]);
 
   console.log(`  ✓ applied: ${dir}`);
 }
 
 console.log("Migrations complete.");
-await client.close();

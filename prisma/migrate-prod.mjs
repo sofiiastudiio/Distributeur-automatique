@@ -101,3 +101,29 @@ for (const dir of dirs) {
 }
 
 console.log("Migrations complete.");
+
+// Seed distributors if missing
+await sql(`
+  INSERT OR IGNORE INTO Distributor (id, name, location, address) VALUES
+    ('SAFEBOX-A', 'SafeBox A', 'Bâtiment A — RDC', 'Rue de la Paix 1, 1204 Genève'),
+    ('SAFEBOX-B', 'SafeBox B', 'Bâtiment B — 1er étage', 'Rue de la Paix 3, 1204 Genève')
+`);
+console.log("Distributors seeded.");
+
+// Seed stocks (quantity=10) for any missing product × distributor combo
+const productsResult = await sql("SELECT id FROM Product");
+const productIds = (productsResult?.rows ?? []).map((r) => r[0]);
+for (const productId of productIds) {
+  for (const distId of ["SAFEBOX-A", "SAFEBOX-B"]) {
+    await sql(
+      "INSERT OR IGNORE INTO Stock (distributor_id, product_id, quantity) VALUES (?, ?, 10)",
+      [
+        { type: "text", value: distId },
+        { type: "integer", value: productId },
+      ]
+    );
+  }
+}
+if (productIds.length > 0) {
+  console.log(`Stocks seeded for ${productIds.length} products × 2 distributors.`);
+}

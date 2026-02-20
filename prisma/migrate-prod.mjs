@@ -122,7 +122,8 @@ const productIds = (productsResult?.rows ?? []).map((r) => {
 for (const productId of productIds) {
   for (const distId of ["SAFEBOX-A", "SAFEBOX-B"]) {
     await sql(
-      "INSERT OR IGNORE INTO Stock (distributor_id, product_id, quantity) VALUES (?, ?, 10)",
+      `INSERT INTO Stock (distributor_id, product_id, quantity) VALUES (?, ?, 10)
+       ON CONFLICT(distributor_id, product_id) DO UPDATE SET quantity = 10 WHERE quantity = 0`,
       [
         { type: "text", value: distId },
         { type: "integer", value: String(productId) },

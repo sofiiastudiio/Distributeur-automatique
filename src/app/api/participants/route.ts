@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
       const session = await tx.session.create({
         data: {
           participant_id: participant.id,
+          distributor_id: body.distributor_id || "SAFEBOX-A",
           budget_set: 0,
         },
       });

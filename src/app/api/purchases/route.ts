@@ -10,6 +10,13 @@ export async function POST(request: NextRequest) {
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    // Get the session to know which distributor
+    const session = await tx.session.findUnique({
+      where: { id: session_id },
+      select: { distributor_id: true },
+    });
+    const distributor_id = session?.distributor_id ?? "SAFEBOX-A";
+
     const purchases = [];
     let totalSpent = 0;
     let totalItems = 0;
@@ -27,6 +34,17 @@ export async function POST(request: NextRequest) {
       purchases.push(purchase);
       totalSpent += purchase.total_price;
       totalItems += item.quantity;
+
+      // Decrement stock (floor at 0)
+      const stock = await tx.stock.findUnique({
+        where: { distributor_id_product_id: { distributor_id, product_id: item.product_id } },
+      });
+      if (stock) {
+        await tx.stock.update({
+          where: { id: stock.id },
+          data: { quantity: Math.max(0, stock.quantity - item.quantity) },
+        });
+      }
     }
 
     await tx.session.update({

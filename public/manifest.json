@@ -1,0 +1,24 @@
+{
+  "name": "SafeBox",
+  "short_name": "SafeBox",
+  "description": "Consultez le stock de votre distributeur SafeBox en temps réel",
+  "start_url": "/app",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0D9488",
+  "background_color": "#F8FAFC",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

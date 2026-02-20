@@ -12,6 +12,7 @@ import {
 export default function OnboardingPage() {
   const router = useRouter();
   const setSession = useSessionStore((s) => s.setSession);
+  const distributorId = useSessionStore((s) => s.distributorId);
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -33,14 +34,14 @@ export default function OnboardingPage() {
       const res = await fetch("/api/participants", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, distributor_id: distributorId }),
       });
       if (!res.ok) {
         const text = await res.text().catch(() => "");
         throw new Error(`Erreur ${res.status}: ${text || res.statusText}`);
       }
       const data = await res.json();
-      setSession(data.session_id, data.participant_id);
+      setSession(data.session_id, data.participant_id, distributorId);
       router.push("/machine");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur de connexion");

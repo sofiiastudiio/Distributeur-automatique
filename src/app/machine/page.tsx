@@ -35,8 +35,14 @@ const SECTIONS = [
   { key: "drink", label: "Boissons", prefix: "C" },
 ] as const;
 
+const DISTRIBUTORS = [
+  { id: "SAFEBOX-A", label: "SafeBox A — Bât. A RDC" },
+  { id: "SAFEBOX-B", label: "SafeBox B — Bât. B 1er" },
+];
+
 export default function MachinePage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [stockMap, setStockMap] = useState<Record<number, number>>({});
   const [dispensing, setDispensing] = useState<number | null>(null);
   const [lastDispensed, setLastDispensed] = useState<Product | null>(null);
   const [showPickup, setShowPickup] = useState(false);
@@ -45,27 +51,41 @@ export default function MachinePage() {
   const [lcdError, setLcdError] = useState<string | null>(null);
   const [insertAnim, setInsertAnim] = useState<string | null>(null);
 
-  // Pending purchase: product selected, waiting for payment
   const [pendingProduct, setPendingProduct] = useState<Product | null>(null);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
 
   const router = useRouter();
   const sessionId = useSessionStore((s) => s.sessionId);
+  const distributorId = useSessionStore((s) => s.distributorId);
+  const setDistributor = useSessionStore((s) => s.setDistributor);
+  const moneyInserted = useSessionStore((s) => s.moneyInserted);
   const insertMoney = useSessionStore((s) => s.insertMoney);
   const addSpending = useSessionStore((s) => s.addSpending);
   const budget = useSessionStore((s) => s.budget);
   const amountSpent = useSessionStore((s) => s.amountSpent);
   const { track, flush } = useEventTracker();
 
-  // Credit = total money in machine minus what's been spent
   const credit = budget - amountSpent;
-
-  // How much more the user needs to insert for the pending product
   const amountNeeded = pendingProduct ? Math.max(0, pendingProduct.price - credit) : 0;
+
+  const loadStock = useCallback(() => {
+    fetch(`/api/stock?distributor=${distributorId}`)
+      .then((r) => r.json())
+      .then((data: { product_id: number; quantity: number }[]) => {
+        const map: Record<number, number> = {};
+        for (const s of data) map[s.product_id] = s.quantity;
+        setStockMap(map);
+      })
+      .catch(() => {});
+  }, [distributorId]);
 
   useEffect(() => {
     fetch("/api/products").then((r) => r.json()).then(setProducts);
   }, []);
+
+  useEffect(() => {
+    loadStock();
+  }, [loadStock]);
 
   // Auto-dispense when enough money is inserted
   useEffect(() => {
@@ -82,6 +102,7 @@ export default function MachinePage() {
         setDispensing(null);
         setLastDispensed(product);
         setShowPickup(true);
+        loadStock();
       }, 2200);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -100,8 +121,9 @@ export default function MachinePage() {
     router.push("/feedback");
   }, [track, flush, router, amountSpent, budget]);
 
-  const handleProductClick = (sectionPrefix: string, idx: number) => {
+  const handleProductClick = (sectionPrefix: string, idx: number, product: Product) => {
     if (dispensing || pendingProduct) return;
+    if ((stockMap[product.id] ?? 0) === 0) return;
     const letter = sectionPrefix;
     const num = idx + 1;
     setLcdError(null);
@@ -179,7 +201,11 @@ export default function MachinePage() {
       }, 1500);
       return;
     }
-    // If user already has enough credit, dispense immediately
+    if ((stockMap[product.id] ?? 0) === 0) {
+      setLcdError("Épuisé");
+      setTimeout(() => { setLcdError(null); setSelectedLetter(null); setSelectedNumber(null); }, 1500);
+      return;
+    }
     if (credit >= product.price) {
       track("purchase_confirm", { product_id: product.id, category: product.category, metadata: { code, price: product.price } });
       recordPurchase(product);
@@ -192,9 +218,9 @@ export default function MachinePage() {
         setDispensing(null);
         setLastDispensed(product);
         setShowPickup(true);
+        loadStock();
       }, 2200);
     } else {
-      // Not enough credit → show price, open money insertion
       setPendingProduct(product);
     }
   };
@@ -205,7 +231,6 @@ export default function MachinePage() {
       ? `${selectedLetter}${selectedNumber}`
       : null;
 
-  // LCD text logic
   const lcdText = lcdError
     ? lcdError
     : pendingProduct
@@ -395,6 +420,31 @@ export default function MachinePage() {
             </div>
 
             <div className="flex items-center gap-3 lg:gap-5">
+              {/* Distributor selector — only before money is inserted */}
+              {!moneyInserted && (
+                <select
+                  value={distributorId}
+                  onChange={async (e) => {
+                    const newId = e.target.value;
+                    setDistributor(newId);
+                    if (sessionId) {
+                      try {
+                        await fetch(`/api/sessions/${sessionId}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ distributor_id: newId }),
+                        });
+                      } catch { /* silent */ }
+                    }
+                  }}
+                  className="hidden sm:block rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+                >
+                  {DISTRIBUTORS.map((d) => (
+                    <option key={d.id} value={d.id}>{d.label}</option>
+                  ))}
+                </select>
+              )}
+
               <div className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-slate-50 to-teal-50/50 px-3 py-2 ring-1 ring-slate-200/60 lg:gap-3 lg:px-5 lg:py-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-teal-400 to-emerald-500 shadow-md shadow-teal-500/20 lg:h-9 lg:w-9">
                   <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -441,12 +491,18 @@ export default function MachinePage() {
                       {sectionProducts.map((product, idx) => {
                         const slotCode = `${section.prefix}${idx + 1}`;
                         const isHighlighted = highlightCode === slotCode;
+                        const stock = stockMap[product.id] ?? null;
+                        const isOutOfStock = stock !== null && stock === 0;
 
                         return (
                           <div
                             key={product.id}
-                            onClick={() => handleProductClick(section.prefix, idx)}
-                            className={`relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-[0_2px_16px_rgba(0,0,0,0.06)] ring-1 transition-all duration-300 cursor-pointer hover:shadow-lg active:scale-[0.98] ${
+                            onClick={() => handleProductClick(section.prefix, idx, product)}
+                            className={`relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-[0_2px_16px_rgba(0,0,0,0.06)] ring-1 transition-all duration-300 ${
+                              isOutOfStock
+                                ? "opacity-50 cursor-not-allowed grayscale"
+                                : "cursor-pointer hover:shadow-lg active:scale-[0.98]"
+                            } ${
                               isHighlighted
                                 ? "ring-2 ring-teal-400 shadow-[0_0_20px_rgba(20,184,166,0.3)]"
                                 : "ring-black/[0.03] hover:ring-teal-200"
@@ -477,6 +533,19 @@ export default function MachinePage() {
                                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+
+                              {/* Stock badge */}
+                              {stock !== null && (
+                                <div className={`absolute bottom-2 left-2 rounded-md px-1.5 py-0.5 text-[9px] font-bold shadow-sm ${
+                                  isOutOfStock
+                                    ? "bg-red-500 text-white"
+                                    : stock <= 3
+                                      ? "bg-orange-400 text-white"
+                                      : "bg-white/90 text-slate-600"
+                                }`}>
+                                  {isOutOfStock ? "Épuisé" : `${stock} restant${stock > 1 ? "s" : ""}`}
+                                </div>
+                              )}
 
                               <div className="absolute bottom-2 right-2 flex gap-1">
                                 {product.is_vegan && (
@@ -543,21 +612,17 @@ export default function MachinePage() {
         {/* ═══ PICKUP OVERLAY ═══ */}
         {showPickup && lastDispensed && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
-            {/* Backdrop */}
             <div
               className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-[fadeIn_0.3s_ease-out]"
               onClick={() => setShowPickup(false)}
             />
-            {/* Card */}
             <div className="relative z-10 m-4 w-full max-w-sm animate-[slideUp_0.4s_ease-out] rounded-3xl bg-white p-6 shadow-2xl">
-              {/* Animated check */}
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 shadow-lg shadow-emerald-500/30 animate-[scaleIn_0.5s_ease-out]">
                 <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
 
-              {/* Product image */}
               <div className="mx-auto mb-4 h-40 w-40 overflow-hidden rounded-2xl shadow-md">
                 <Image
                   src={lastDispensed.image_url}
@@ -568,14 +633,12 @@ export default function MachinePage() {
                 />
               </div>
 
-              {/* Product info */}
               <h3 className="text-center text-lg font-bold text-slate-800">{lastDispensed.name}</h3>
               <p className="mt-1 text-center text-sm text-slate-400">CHF {lastDispensed.price.toFixed(2)}</p>
               <p className="mt-3 text-center text-sm font-medium text-emerald-600">
                 Récupérez votre article ci-dessous
               </p>
 
-              {/* Dismiss button */}
               <button
                 onClick={() => setShowPickup(false)}
                 className="mt-5 w-full rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-500 py-3.5 text-sm font-bold text-white shadow-md shadow-teal-500/25 transition-all active:scale-95"

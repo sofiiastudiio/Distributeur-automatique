@@ -1,8 +1,20 @@
 import "dotenv/config";
+import path from "node:path";
 import { PrismaClient } from "@prisma/client";
+import { PrismaLibSql } from "@prisma/adapter-libsql";
 import { products } from "../src/lib/products";
 
-const prisma = new PrismaClient();
+const adapter = new PrismaLibSql({ url: `file:${path.join(process.cwd(), "dev.db")}` });
+const prisma = new PrismaClient({ adapter });
+
+const DISTRIBUTORS = [
+  { id: "SAFEBOX-A", name: "SafeBox A", location: "Bâtiment A — RDC", address: "Rue de la Paix 1, 1204 Genève" },
+  { id: "SAFEBOX-B", name: "SafeBox B", location: "Bâtiment B — 1er étage", address: "Rue de la Paix 3, 1204 Genève" },
+];
+
+function randStock() {
+  return Math.floor(Math.random() * 11) + 5; // 5–15
+}
 
 async function main() {
   console.log("Seeding database...");
@@ -10,11 +22,21 @@ async function main() {
   await prisma.event.deleteMany();
   await prisma.purchase.deleteMany();
   await prisma.session.deleteMany();
+  await prisma.stock.deleteMany();
   await prisma.participant.deleteMany();
   await prisma.product.deleteMany();
+  await prisma.distributor.deleteMany();
 
+  // Distributors
+  for (const d of DISTRIBUTORS) {
+    await prisma.distributor.create({ data: d });
+  }
+  console.log(`Seeded ${DISTRIBUTORS.length} distributors`);
+
+  // Products
+  const createdProducts = [];
   for (const p of products) {
-    await prisma.product.create({
+    const created = await prisma.product.create({
       data: {
         name: p.name,
         category: p.category,
@@ -33,9 +55,23 @@ async function main() {
         is_vegetarian: p.is_vegetarian,
       },
     });
+    createdProducts.push(created);
   }
-
   console.log(`Seeded ${products.length} products`);
+
+  // Stocks
+  for (const distributor of DISTRIBUTORS) {
+    for (const product of createdProducts) {
+      await prisma.stock.create({
+        data: {
+          distributor_id: distributor.id,
+          product_id: product.id,
+          quantity: randStock(),
+        },
+      });
+    }
+  }
+  console.log(`Seeded stocks for ${DISTRIBUTORS.length} distributors × ${createdProducts.length} products`);
 }
 
 main()

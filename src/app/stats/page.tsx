@@ -10,6 +10,11 @@ import {
 const COLORS = ["#0d9488", "#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
 const CAT_COLORS: Record<string, string> = { Plats: "#0d9488", Snacks: "#06b6d4", Boissons: "#10b981" };
 
+const DISTRIBUTORS = [
+  { id: "SAFEBOX-A", label: "SafeBox A — Bât. A RDC" },
+  { id: "SAFEBOX-B", label: "SafeBox B — Bât. B 1er" },
+];
+
 interface Stats {
   overview: {
     totalSessions: number;
@@ -43,6 +48,9 @@ interface Stats {
   }[];
 }
 
+interface StockItem { product_id: number; quantity: number; }
+interface ProductInfo { id: number; name: string; category: string; }
+
 function MetricCard({ label, value, sub, accent }: { label: string; value: string | number; sub?: string; accent?: boolean }) {
   return (
     <div className={`rounded-2xl p-5 ${accent ? "bg-gradient-to-br from-teal-500 to-emerald-600 text-white" : "bg-white ring-1 ring-slate-200/60"}`}>
@@ -64,6 +72,14 @@ export default function StatsPage() {
   const [loading, setLoading] = useState(true);
   const [resetting, setResetting] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const [selectedDistributor, setSelectedDistributor] = useState("SAFEBOX-A");
+  const [stocks, setStocks] = useState<StockItem[]>([]);
+  const [allProducts, setAllProducts] = useState<ProductInfo[]>([]);
+  const [stockLoading, setStockLoading] = useState(false);
+  const [restocking, setRestocking] = useState(false);
+  const [restockSuccess, setRestockSuccess] = useState(false);
 
   const loadStats = () => {
     setLoading(true);
@@ -73,7 +89,27 @@ export default function StatsPage() {
       .catch(() => setLoading(false));
   };
 
+  const loadStock = (distId: string) => {
+    setStockLoading(true);
+    Promise.all([
+      fetch(`/api/stock?distributor=${distId}`).then((r) => r.json()),
+      fetch("/api/products").then((r) => r.json()),
+    ]).then(([stockData, productsData]) => {
+      setStocks(stockData);
+      setAllProducts(productsData);
+      setStockLoading(false);
+    }).catch(() => setStockLoading(false));
+  };
+
   useEffect(() => { loadStats(); }, []);
+  useEffect(() => { loadStock(selectedDistributor); }, [selectedDistributor]);
+
+  const handleDeleteSession = async (id: number) => {
+    setDeletingId(id);
+    await fetch(`/api/sessions/${id}`, { method: "DELETE" });
+    setDeletingId(null);
+    loadStats();
+  };
 
   const handleReset = async () => {
     setResetting(true);
@@ -82,6 +118,28 @@ export default function StatsPage() {
     setResetting(false);
     loadStats();
   };
+
+  const handleRestock = async () => {
+    setRestocking(true);
+    setRestockSuccess(false);
+    try {
+      await fetch("/api/stock/restock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ distributor_id: selectedDistributor }),
+      });
+      setRestockSuccess(true);
+      loadStock(selectedDistributor);
+      setTimeout(() => setRestockSuccess(false), 3000);
+    } catch { /* silent */ }
+    finally { setRestocking(false); }
+  };
+
+  // Build stock map for display
+  const stockMap: Record<number, number> = {};
+  for (const s of stocks) stockMap[s.product_id] = s.quantity;
+
+  const CATEGORIES: Record<string, string> = { meal: "Plats préparés", snack: "Snacks", drink: "Boissons" };
 
   if (loading) {
     return (
@@ -171,6 +229,86 @@ export default function StatsPage() {
             <MetricCard label="Codes invalides" value={o.invalidCodes} sub="Erreurs de saisie" />
             <MetricCard label="Annulations" value={o.cancellations} sub="Sélections annulées" />
           </div>
+        </section>
+
+        {/* ═══ STOCK PANEL ═══ */}
+        <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200/60">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <SectionTitle>Niveaux de stock</SectionTitle>
+            <div className="flex items-center gap-3">
+              {/* Distributor selector */}
+              <div className="flex rounded-xl overflow-hidden ring-1 ring-slate-200">
+                {DISTRIBUTORS.map((d) => (
+                  <button
+                    key={d.id}
+                    onClick={() => setSelectedDistributor(d.id)}
+                    className={`px-4 py-2 text-xs font-semibold transition-colors ${
+                      selectedDistributor === d.id
+                        ? "bg-teal-500 text-white"
+                        : "bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {d.id === "SAFEBOX-A" ? "Bât. A" : "Bât. B"}
+                  </button>
+                ))}
+              </div>
+              {/* Restock button */}
+              <button
+                onClick={handleRestock}
+                disabled={restocking}
+                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all disabled:opacity-50 ${
+                  restockSuccess
+                    ? "bg-emerald-500 text-white"
+                    : "bg-teal-50 text-teal-700 ring-1 ring-teal-200 hover:bg-teal-100"
+                }`}
+              >
+                {restocking ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-teal-200 border-t-teal-600" />
+                ) : restockSuccess ? (
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                )}
+                {restockSuccess ? "Réapprovisionné !" : "Réapprovisionner"}
+              </button>
+            </div>
+          </div>
+
+          {stockLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-teal-200 border-t-teal-500" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {allProducts.map((product) => {
+                const qty = stockMap[product.id] ?? 0;
+                const isOut = qty === 0;
+                const isLow = !isOut && qty <= 3;
+                return (
+                  <div
+                    key={product.id}
+                    className={`flex items-center justify-between rounded-xl px-3 py-2.5 ring-1 ${
+                      isOut ? "bg-red-50 ring-red-100" : isLow ? "bg-orange-50 ring-orange-100" : "bg-slate-50 ring-slate-100"
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-slate-700 truncate">{product.name}</p>
+                      <p className="text-[10px] text-slate-400">{CATEGORIES[product.category] ?? product.category}</p>
+                    </div>
+                    <div className={`ml-2 shrink-0 rounded-lg px-2 py-1 text-xs font-bold ${
+                      isOut ? "bg-red-500 text-white" : isLow ? "bg-orange-400 text-white" : "bg-emerald-500 text-white"
+                    }`}>
+                      {qty}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         {/* Charts row */}
@@ -321,12 +459,13 @@ export default function StatsPage() {
                     <th className="pb-3 pr-4 font-semibold text-slate-500">Dépensé</th>
                     <th className="pb-3 pr-4 font-semibold text-slate-500">Articles</th>
                     <th className="pb-3 pr-4 font-semibold text-slate-500">Produits achetés</th>
-                    <th className="pb-3 font-semibold text-slate-500">Date</th>
+                    <th className="pb-3 pr-4 font-semibold text-slate-500">Date</th>
+                    <th className="pb-3" />
                   </tr>
                 </thead>
                 <tbody>
                   {stats.recentSessions.map((s) => (
-                    <tr key={s.id} className="border-b border-slate-50 hover:bg-slate-50/50">
+                    <tr key={s.id} className="group border-b border-slate-50 hover:bg-slate-50/50">
                       <td className="py-3 pr-4 font-medium text-slate-700">{s.participant}</td>
                       <td className="py-3 pr-4 text-slate-600">{s.budget} CHF</td>
                       <td className="py-3 pr-4 font-semibold text-teal-600">{s.spent} CHF</td>
@@ -341,8 +480,24 @@ export default function StatsPage() {
                           {s.products.length === 0 && <span className="text-xs text-slate-300">Aucun</span>}
                         </div>
                       </td>
-                      <td className="py-3 text-xs text-slate-400">
+                      <td className="py-3 pr-4 text-xs text-slate-400">
                         {new Date(s.date).toLocaleDateString("fr-CH", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                      </td>
+                      <td className="py-3">
+                        <button
+                          onClick={() => handleDeleteSession(s.id)}
+                          disabled={deletingId === s.id}
+                          className="flex h-6 w-6 items-center justify-center rounded-full text-slate-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-400 group-hover:opacity-100 disabled:opacity-50"
+                          title="Supprimer cette session"
+                        >
+                          {deletingId === s.id ? (
+                            <div className="h-3 w-3 animate-spin rounded-full border border-slate-300 border-t-slate-500" />
+                          ) : (
+                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          )}
+                        </button>
                       </td>
                     </tr>
                   ))}

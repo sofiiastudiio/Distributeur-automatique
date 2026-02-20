@@ -5,11 +5,13 @@ import { create } from "zustand";
 interface SessionState {
   sessionId: number | null;
   participantId: number | null;
+  distributorId: string;
   budget: number;
   amountSpent: number;
   status: "idle" | "active" | "completed";
   moneyInserted: boolean;
-  setSession: (sessionId: number, participantId: number) => void;
+  setSession: (sessionId: number, participantId: number, distributorId?: string) => void;
+  setDistributor: (id: string) => void;
   insertMoney: (amount: number) => Promise<void>;
   addSpending: (amount: number) => void;
   remaining: () => number;
@@ -19,13 +21,16 @@ interface SessionState {
 export const useSessionStore = create<SessionState>((set, get) => ({
   sessionId: null,
   participantId: null,
+  distributorId: "SAFEBOX-A",
   budget: 0,
   amountSpent: 0,
   status: "idle",
   moneyInserted: false,
 
-  setSession: (sessionId, participantId) =>
-    set({ sessionId, participantId, budget: 0, amountSpent: 0, status: "active", moneyInserted: false }),
+  setSession: (sessionId, participantId, distributorId = "SAFEBOX-A") =>
+    set({ sessionId, participantId, distributorId, budget: 0, amountSpent: 0, status: "active", moneyInserted: false }),
+
+  setDistributor: (id) => set({ distributorId: id }),
 
   insertMoney: async (amount) => {
     const { sessionId, budget } = get();
@@ -53,6 +58,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({
       sessionId: null,
       participantId: null,
+      distributorId: "SAFEBOX-A",
       budget: 0,
       amountSpent: 0,
       status: "idle",

@@ -6,6 +6,26 @@ datasource db {
   provider = "sqlite"
 }
 
+model Distributor {
+  id       String    @id   // "SAFEBOX-A" | "SAFEBOX-B"
+  name     String
+  location String
+  address  String
+  stocks   Stock[]
+  sessions Session[]
+}
+
+model Stock {
+  id             Int         @id @default(autoincrement())
+  distributor_id String
+  distributor    Distributor @relation(fields: [distributor_id], references: [id])
+  product_id     Int
+  product        Product     @relation(fields: [product_id], references: [id])
+  quantity       Int
+  updated_at     DateTime    @updatedAt
+  @@unique([distributor_id, product_id])
+}
+
 model Product {
   id               Int        @id @default(autoincrement())
   name             String
@@ -26,6 +46,7 @@ model Product {
   created_at       DateTime   @default(now())
   purchases        Purchase[]
   events           Event[]
+  stocks           Stock[]
 }
 
 model Participant {
@@ -45,6 +66,8 @@ model Session {
   id              Int        @id @default(autoincrement())
   participant_id  Int
   participant     Participant @relation(fields: [participant_id], references: [id])
+  distributor_id  String     @default("SAFEBOX-A")
+  distributor     Distributor @relation(fields: [distributor_id], references: [id])
   budget_set      Float
   total_spent     Float      @default(0)
   items_purchased Int        @default(0)

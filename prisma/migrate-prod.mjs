@@ -121,12 +121,14 @@ const productIds = (productsResult?.rows ?? []).map((r) => {
 });
 for (const productId of productIds) {
   for (const distId of ["SAFEBOX-A", "SAFEBOX-B"]) {
+    const qty = Math.floor(Math.random() * 11) + 5; // 5–15
     await sql(
-      `INSERT INTO Stock (distributor_id, product_id, quantity, updated_at) VALUES (?, ?, 10, datetime('now'))
-       ON CONFLICT(distributor_id, product_id) DO UPDATE SET quantity = 10, updated_at = datetime('now') WHERE quantity = 0`,
+      `INSERT INTO Stock (distributor_id, product_id, quantity, updated_at) VALUES (?, ?, ?, datetime('now'))
+       ON CONFLICT(distributor_id, product_id) DO UPDATE SET quantity = excluded.quantity, updated_at = datetime('now') WHERE quantity = 0`,
       [
         { type: "text", value: distId },
         { type: "integer", value: String(productId) },
+        { type: "integer", value: String(qty) },
       ]
     );
   }

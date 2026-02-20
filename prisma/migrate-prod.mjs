@@ -1,5 +1,5 @@
 // Production migration script for Turso.
-// Uses Turso's HTTP API directly (no @libsql/client import issues).
+// Uses Turso's HTTP API directly with fetch (no extra dependencies).
 import { readFileSync, readdirSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -13,7 +13,6 @@ if (!tursoUrl) {
   process.exit(0);
 }
 
-// Convert libsql:// → https:// for Turso HTTP API
 const httpUrl = tursoUrl.replace(/^libsql:\/\//, "https://");
 
 async function sql(query, args = []) {
@@ -32,16 +31,17 @@ async function sql(query, args = []) {
   });
 
   const data = await res.json();
-  if (data.results?.[0]?.type === "error") {
-    throw new Error(data.results[0].error.message);
+  const result = data.results?.[0];
+  if (result?.type === "error") {
+    throw new Error(result.error.message);
   }
-  return data.results?.[0]?.response?.result;
+  return result?.response?.result;
 }
 
-// Create migrations tracking table
+// Create tracking table
 await sql(`
   CREATE TABLE IF NOT EXISTS _applied_migrations (
-    name TEXT PRIMARY KEY,
+    name       TEXT PRIMARY KEY,
     applied_at TEXT NOT NULL DEFAULT (datetime('now'))
   )
 `);
@@ -57,32 +57,47 @@ for (const dir of dirs) {
   const sqlFile = join(migrationsDir, dir, "migration.sql");
   if (!existsSync(sqlFile)) continue;
 
-  // Check if already applied
-  const result = await sql(
+  // Already tracked?
+  const tracked = await sql(
     "SELECT name FROM _applied_migrations WHERE name = ?",
     [{ type: "text", value: dir }]
   );
-  if (result?.rows?.length > 0) {
-    console.log(`  skip: ${dir}`);
+  if (tracked?.rows?.length > 0) {
+    console.log(`  skip (tracked): ${dir}`);
     continue;
   }
 
-  // Apply migration statement by statement
   const content = readFileSync(sqlFile, "utf-8");
-  const statements = content
-    .split(";")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const statements = content.split(";").map((s) => s.trim()).filter(Boolean);
 
+  let skipped = 0;
   for (const stmt of statements) {
-    await sql(stmt);
+    try {
+      await sql(stmt);
+    } catch (err) {
+      // If table/index already exists, the migration was applied before we
+      // started tracking — treat it as already done.
+      if (
+        err.message.includes("already exists") ||
+        err.message.includes("duplicate column")
+      ) {
+        skipped++;
+      } else {
+        throw err;
+      }
+    }
   }
 
-  await sql("INSERT INTO _applied_migrations (name) VALUES (?)", [
+  // Mark as applied whether it ran fresh or was already there
+  await sql("INSERT OR IGNORE INTO _applied_migrations (name) VALUES (?)", [
     { type: "text", value: dir },
   ]);
 
-  console.log(`  ✓ applied: ${dir}`);
+  if (skipped === statements.length) {
+    console.log(`  ✓ marked as applied (was already on DB): ${dir}`);
+  } else {
+    console.log(`  ✓ applied: ${dir}`);
+  }
 }
 
 console.log("Migrations complete.");

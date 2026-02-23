@@ -588,7 +588,7 @@ export default function MachinePage() {
         <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
 
             {/* ── Left: Product Vitrine ── */}
-          <div ref={vitrineRef} className="flex-1 select-none overflow-y-auto px-4 py-4 lg:px-6 lg:py-5" style={{ touchAction: "pan-y" }}>
+          <div ref={vitrineRef} className="vitrine-scroll flex-1 select-none overflow-y-auto px-4 py-4 lg:px-6 lg:py-5" style={{ touchAction: "pan-y" }}>
             <div className="mx-auto max-w-6xl space-y-6">
               {SECTIONS.map((section, sIdx) => {
                 const sectionProducts = products.filter((p) => p.category === section.key);

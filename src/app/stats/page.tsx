@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import * as XLSX from "xlsx";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -163,6 +164,119 @@ export default function StatsPage() {
   const o = stats.overview;
   const genderLabels: Record<string, string> = { male: "Homme", female: "Femme", other: "Autre", prefer_not: "Non précisé" };
 
+  const exportExcel = () => {
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1 — Vue d'ensemble
+    const overviewRows = [
+      { "Indicateur": "Sessions", "Valeur": o.totalSessions },
+      { "Indicateur": "Achats", "Valeur": o.totalPurchases },
+      { "Indicateur": "Revenu total (CHF)", "Valeur": o.totalRevenue },
+      { "Indicateur": "Dépense moyenne (CHF)", "Valeur": o.avgSpend },
+      { "Indicateur": "Budget moyen (CHF)", "Valeur": o.avgBudget },
+      { "Indicateur": "Utilisation budget (%)", "Valeur": o.budgetUtilization },
+      { "Indicateur": "Produit star", "Valeur": o.mostPopular },
+      { "Indicateur": "Durée moy. session (s)", "Valeur": o.avgDuration },
+      { "Indicateur": "Codes invalides", "Valeur": o.invalidCodes },
+      { "Indicateur": "Annulations", "Valeur": o.cancellations },
+      { "Indicateur": "Participants", "Valeur": o.totalParticipants },
+    ];
+    const ws1 = XLSX.utils.json_to_sheet(overviewRows);
+    ws1["!cols"] = [{ wch: 30 }, { wch: 20 }];
+    XLSX.utils.book_append_sheet(wb, ws1, "Vue d'ensemble");
+
+    // Sheet 2 — Popularité produits
+    const ws2 = XLSX.utils.json_to_sheet(
+      stats.productPopularity.map((p) => ({
+        "Produit": p.name,
+        "Catégorie": p.category,
+        "Ventes": p.count,
+        "Revenu (CHF)": p.revenue,
+      }))
+    );
+    ws2["!cols"] = [{ wch: 30 }, { wch: 14 }, { wch: 10 }, { wch: 14 }];
+    XLSX.utils.book_append_sheet(wb, ws2, "Popularité produits");
+
+    // Sheet 3 — Revenus par catégorie
+    const ws3 = XLSX.utils.json_to_sheet(
+      stats.categoryRevenue.map((c) => ({
+        "Catégorie": c.name,
+        "Revenu (CHF)": c.value,
+        "Articles vendus": c.count,
+      }))
+    );
+    ws3["!cols"] = [{ wch: 16 }, { wch: 14 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, ws3, "Revenus catégories");
+
+    // Sheet 4 — Budget vs Dépenses
+    const ws4 = XLSX.utils.json_to_sheet(
+      stats.spendingDistribution.map((s) => ({
+        "Participant": s.name,
+        "Budget (CHF)": s.budget,
+        "Dépensé (CHF)": s.spent,
+        "Articles": s.items,
+      }))
+    );
+    ws4["!cols"] = [{ wch: 20 }, { wch: 12 }, { wch: 14 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, ws4, "Budget vs Dépenses");
+
+    // Sheet 5 — Démographies
+    const demoRows = [
+      { "Type": "— Tranches d'âge —", "Valeur": "", "Count": "" },
+      ...stats.demographics.age.map((d) => ({ "Type": d.name, "Valeur": "", "Count": d.value })),
+      { "Type": "— Genre —", "Valeur": "", "Count": "" },
+      ...stats.demographics.gender.map((d) => ({ "Type": genderLabels[d.name] || d.name, "Valeur": "", "Count": d.value })),
+      { "Type": "— Allergies —", "Valeur": "", "Count": "" },
+      ...stats.demographics.allergies.map((d) => ({ "Type": d.name.replace(/-/g, " "), "Valeur": "", "Count": d.value })),
+    ];
+    const ws5 = XLSX.utils.json_to_sheet(demoRows);
+    ws5["!cols"] = [{ wch: 24 }, { wch: 10 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, ws5, "Démographies");
+
+    // Sheet 6 — Sessions récentes
+    const ws6 = XLSX.utils.json_to_sheet(
+      stats.recentSessions.map((s) => ({
+        "ID": s.id,
+        "Participant": s.participant,
+        "Budget (CHF)": s.budget,
+        "Dépensé (CHF)": s.spent,
+        "Articles": s.items,
+        "Produits": s.products.map((p) => `${p.name}${p.quantity > 1 ? ` x${p.quantity}` : ""}`).join(", "),
+        "Date": new Date(s.date).toLocaleDateString("fr-CH", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+      }))
+    );
+    ws6["!cols"] = [{ wch: 6 }, { wch: 20 }, { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 50 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, ws6, "Sessions récentes");
+
+    XLSX.writeFile(wb, `safebox-stats-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const exportCSV = () => {
+    const rows = [
+      ["Indicateur", "Valeur"],
+      ["Sessions", o.totalSessions],
+      ["Achats", o.totalPurchases],
+      ["Revenu total (CHF)", o.totalRevenue],
+      ["Dépense moyenne (CHF)", o.avgSpend],
+      ["Budget moyen (CHF)", o.avgBudget],
+      ["Utilisation budget (%)", o.budgetUtilization],
+      ["Produit star", o.mostPopular],
+      ["Durée moy. session (s)", o.avgDuration],
+      ["Participants", o.totalParticipants],
+      [],
+      ["Produit", "Catégorie", "Ventes", "Revenu (CHF)"],
+      ...stats.productPopularity.map((p) => [p.name, p.category, p.count, p.revenue]),
+    ];
+    const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `safebox-stats-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="min-h-dvh bg-gradient-to-br from-slate-50 via-white to-teal-50/20">
       {/* Header */}
@@ -174,7 +288,38 @@ export default function StatsPage() {
             </h1>
             <p className="text-xs text-slate-400">TM GutFree — Étude comportementale</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {/* Export buttons */}
+            <button
+              onClick={exportExcel}
+              className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 active:scale-95 transition-all"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Excel
+            </button>
+            <button
+              onClick={exportCSV}
+              className="flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-200 active:scale-95 transition-all"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              CSV
+            </button>
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-200 active:scale-95 transition-all"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              PDF
+            </button>
+
+            <div className="mx-1 h-6 w-px bg-slate-200" />
+
             {confirmReset ? (
               <div className="flex items-center gap-2 rounded-xl bg-red-50 px-4 py-2 ring-1 ring-red-200">
                 <span className="text-sm text-red-700">Tout supprimer ?</span>

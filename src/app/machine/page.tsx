@@ -125,24 +125,21 @@ export default function MachinePage() {
     }
   }, []);
 
-  // Track active section via IntersectionObserver
-  useEffect(() => {
-    const observers = sectionRefs.current.map((ref, idx) => {
-      if (!ref) return null;
-      const obs = new IntersectionObserver(
-        ([entry]) => {
-          if (entry.isIntersecting) {
-            activeSectionIdxRef.current = idx;
-            setActiveSectionIdx(idx);
-          }
-        },
-        { threshold: 0.3 },
-      );
-      obs.observe(ref);
-      return obs;
-    });
-    return () => observers.forEach((obs) => obs?.disconnect());
-  }, [products]);
+  // Track active section via scroll position
+  const handleContainerScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const scrollTop = container.scrollTop + 80; // offset for sticky tab height
+    let current = 0;
+    for (let i = 0; i < sectionRefs.current.length; i++) {
+      const ref = sectionRefs.current[i];
+      if (ref && ref.offsetTop <= scrollTop) current = i;
+    }
+    if (activeSectionIdxRef.current !== current) {
+      activeSectionIdxRef.current = current;
+      setActiveSectionIdx(current);
+    }
+  }, []);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
@@ -522,9 +519,30 @@ export default function MachinePage() {
           <div
             ref={scrollContainerRef}
             className="flex-1 overflow-y-auto px-4 py-4 lg:px-6 lg:py-5"
+            onScroll={handleContainerScroll}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
+            {/* ── Mobile section tabs (sticky top) ── */}
+            <div className="sticky top-0 z-10 -mx-4 mb-3 flex bg-white/95 backdrop-blur-sm shadow-sm lg:hidden">
+              {SECTIONS.map((s, i) => (
+                <button
+                  key={s.key}
+                  onClick={() => scrollToSection(i)}
+                  className={`flex flex-1 items-center justify-center gap-1.5 py-3 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${
+                    i === activeSectionIdx
+                      ? "border-teal-500 text-teal-600"
+                      : "border-transparent text-slate-400 hover:text-slate-600"
+                  }`}
+                >
+                  <span className={`flex h-5 w-5 items-center justify-center rounded-md text-[10px] font-black ${
+                    i === activeSectionIdx ? "bg-teal-500 text-white" : "bg-slate-200 text-slate-500"
+                  }`}>{s.prefix}</span>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+
             <div className="mx-auto max-w-6xl space-y-6">
               {SECTIONS.map((section, sIdx) => {
                 const sectionProducts = products.filter((p) => p.category === section.key);
@@ -635,61 +653,61 @@ export default function MachinePage() {
             <div className="h-80 lg:hidden" />
           </div>
 
+          {/* ── Desktop section nav strip ── */}
+          <div className="hidden lg:flex flex-col items-center justify-center gap-3 border-x border-slate-200/60 bg-slate-100/60 w-14 shrink-0">
+            <button
+              onClick={() => scrollToSection(activeSectionIdxRef.current - 1)}
+              disabled={activeSectionIdx === 0}
+              aria-label="Section précédente"
+              className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 active:scale-95 ${
+                activeSectionIdx === 0
+                  ? "text-slate-300 cursor-not-allowed"
+                  : "bg-white text-slate-600 shadow-md hover:bg-teal-50 hover:text-teal-600 ring-1 ring-slate-200"
+              }`}
+            >
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+              </svg>
+            </button>
+
+            <div className="flex flex-col items-center gap-2">
+              {SECTIONS.map((s, i) => (
+                <button
+                  key={s.key}
+                  onClick={() => scrollToSection(i)}
+                  aria-label={s.label}
+                  title={s.label}
+                  className={`flex items-center justify-center rounded-lg font-mono font-black transition-all duration-200 ${
+                    i === activeSectionIdx
+                      ? "h-9 w-9 bg-teal-500 text-white shadow-md shadow-teal-400/40 text-sm"
+                      : "h-7 w-7 bg-white text-slate-400 hover:bg-teal-50 hover:text-teal-500 text-xs ring-1 ring-slate-200"
+                  }`}
+                >
+                  {s.prefix}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => scrollToSection(activeSectionIdxRef.current + 1)}
+              disabled={activeSectionIdx === SECTIONS.length - 1}
+              aria-label="Section suivante"
+              className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 active:scale-95 ${
+                activeSectionIdx === SECTIONS.length - 1
+                  ? "text-slate-300 cursor-not-allowed"
+                  : "bg-white text-slate-600 shadow-md hover:bg-teal-50 hover:text-teal-600 ring-1 ring-slate-200"
+              }`}
+            >
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </div>
+
           {/* ── Right: Keypad Panel (DESKTOP) ── */}
           <div className="hidden w-[300px] shrink-0 border-l border-slate-200/60 bg-gradient-to-b from-slate-100 to-slate-200/80 p-5 lg:flex lg:flex-col lg:gap-4 lg:overflow-y-auto">
             <KeypadContent />
           </div>
-        </div>
-
-        {/* ═══ SECTION NAVIGATION ARROWS ═══ */}
-        <div className="fixed left-4 top-1/2 z-40 -translate-y-1/2 flex flex-col items-center gap-2 lg:left-6">
-          {/* Up arrow */}
-          <button
-            onClick={() => scrollToSection(activeSectionIdxRef.current - 1)}
-            disabled={activeSectionIdx === 0}
-            aria-label="Section précédente"
-            className={`flex h-14 w-14 items-center justify-center rounded-2xl shadow-xl transition-all duration-200 active:scale-95 ${
-              activeSectionIdx === 0
-                ? "bg-white/40 text-slate-300 cursor-not-allowed shadow-sm"
-                : "bg-white text-slate-700 hover:bg-teal-50 hover:text-teal-600 hover:shadow-teal-200/60 ring-1 ring-slate-200/80"
-            }`}
-          >
-            <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
-            </svg>
-          </button>
-
-          {/* Section dots */}
-          <div className="flex flex-col items-center gap-1.5 py-1">
-            {SECTIONS.map((s, i) => (
-              <button
-                key={s.key}
-                onClick={() => scrollToSection(i)}
-                aria-label={s.label}
-                className={`rounded-full transition-all duration-200 ${
-                  i === activeSectionIdx
-                    ? "h-3 w-3 bg-teal-500 shadow shadow-teal-400/50"
-                    : "h-2 w-2 bg-slate-300 hover:bg-slate-400"
-                }`}
-              />
-            ))}
-          </div>
-
-          {/* Down arrow */}
-          <button
-            onClick={() => scrollToSection(activeSectionIdxRef.current + 1)}
-            disabled={activeSectionIdx === SECTIONS.length - 1}
-            aria-label="Section suivante"
-            className={`flex h-14 w-14 items-center justify-center rounded-2xl shadow-xl transition-all duration-200 active:scale-95 ${
-              activeSectionIdx === SECTIONS.length - 1
-                ? "bg-white/40 text-slate-300 cursor-not-allowed shadow-sm"
-                : "bg-white text-slate-700 hover:bg-teal-50 hover:text-teal-600 hover:shadow-teal-200/60 ring-1 ring-slate-200/80"
-            }`}
-          >
-            <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
         </div>
 
         {/* ═══ MOBILE BOTTOM PANEL ═══ */}

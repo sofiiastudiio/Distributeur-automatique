@@ -55,8 +55,6 @@ export default function MachinePage() {
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
   const sectionRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const touchStartY = useRef(0);
   const activeSectionIdxRef = useRef(0);
 
   const router = useRouter();
@@ -118,40 +116,32 @@ export default function MachinePage() {
     activeSectionIdxRef.current = clamped;
     setActiveSectionIdx(clamped);
     const target = sectionRefs.current[clamped];
-    const container = scrollContainerRef.current;
-    if (target && container) {
-      const top = target.offsetTop - 16;
-      container.scrollTo({ top, behavior: "smooth" });
+    if (target) {
+      const top = target.getBoundingClientRect().top + window.scrollY - 80;
+      window.scrollTo({ top, behavior: "smooth" });
     }
   }, []);
 
-  // Track active section via scroll position
-  const handleContainerScroll = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    const scrollTop = container.scrollTop + 80; // offset for sticky tab height
-    let current = 0;
-    for (let i = 0; i < sectionRefs.current.length; i++) {
-      const ref = sectionRefs.current[i];
-      if (ref && ref.offsetTop <= scrollTop) current = i;
-    }
-    if (activeSectionIdxRef.current !== current) {
-      activeSectionIdxRef.current = current;
-      setActiveSectionIdx(current);
-    }
-  }, []);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartY.current = e.touches[0].clientY;
-  };
-
-  // Use ref to avoid stale closure on activeSectionIdx
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    const delta = touchStartY.current - e.changedTouches[0].clientY;
-    if (Math.abs(delta) > 60) {
-      scrollToSection(activeSectionIdxRef.current + (delta > 0 ? 1 : -1));
-    }
-  }, [scrollToSection]);
+  // Track active section via window scroll
+  useEffect(() => {
+    const onScroll = () => {
+      const scrollY = window.scrollY + 120;
+      let current = 0;
+      for (let i = 0; i < sectionRefs.current.length; i++) {
+        const ref = sectionRefs.current[i];
+        if (ref) {
+          const top = ref.getBoundingClientRect().top + window.scrollY;
+          if (top <= scrollY) current = i;
+        }
+      }
+      if (activeSectionIdxRef.current !== current) {
+        activeSectionIdxRef.current = current;
+        setActiveSectionIdx(current);
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [products]);
 
   const handleInsertMoney = useCallback((value: number, label: string) => {
     setInsertAnim(label);
@@ -515,85 +505,8 @@ export default function MachinePage() {
         {/* ═══ MAIN CONTENT ═══ */}
         <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
 
-          {/* ── Desktop section nav strip (LEFT) ── */}
-          <div className="hidden lg:flex flex-col items-center justify-center gap-3 border-r border-slate-200/60 bg-slate-100/60 w-16 shrink-0">
-            <button
-              onClick={() => scrollToSection(activeSectionIdxRef.current - 1)}
-              disabled={activeSectionIdx === 0}
-              aria-label="Section précédente"
-              className={`flex h-14 w-14 items-center justify-center rounded-2xl transition-all duration-200 active:scale-95 ${
-                activeSectionIdx === 0
-                  ? "text-slate-300 cursor-not-allowed"
-                  : "bg-white text-slate-600 shadow-md hover:bg-teal-50 hover:text-teal-600 ring-1 ring-slate-200"
-              }`}
-            >
-              <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
-              </svg>
-            </button>
-
-            <div className="flex flex-col items-center gap-2">
-              {SECTIONS.map((s, i) => (
-                <button
-                  key={s.key}
-                  onClick={() => scrollToSection(i)}
-                  aria-label={s.label}
-                  title={s.label}
-                  className={`flex items-center justify-center rounded-lg font-mono font-black transition-all duration-200 ${
-                    i === activeSectionIdx
-                      ? "h-9 w-9 bg-teal-500 text-white shadow-md shadow-teal-400/40 text-sm"
-                      : "h-7 w-7 bg-white text-slate-400 hover:bg-teal-50 hover:text-teal-500 text-xs ring-1 ring-slate-200"
-                  }`}
-                >
-                  {s.prefix}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => scrollToSection(activeSectionIdxRef.current + 1)}
-              disabled={activeSectionIdx === SECTIONS.length - 1}
-              aria-label="Section suivante"
-              className={`flex h-14 w-14 items-center justify-center rounded-2xl transition-all duration-200 active:scale-95 ${
-                activeSectionIdx === SECTIONS.length - 1
-                  ? "text-slate-300 cursor-not-allowed"
-                  : "bg-white text-slate-600 shadow-md hover:bg-teal-50 hover:text-teal-600 ring-1 ring-slate-200"
-              }`}
-            >
-              <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-          </div>
-
-          {/* ── Left: Product Vitrine ── */}
-          <div
-            ref={scrollContainerRef}
-            className="flex-1 overflow-y-auto px-4 py-4 lg:px-6 lg:py-5"
-            onScroll={handleContainerScroll}
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
-          >
-            {/* ── Mobile section tabs (sticky top) ── */}
-            <div className="sticky top-0 z-10 -mx-4 mb-3 flex bg-white/95 backdrop-blur-sm shadow-sm lg:hidden">
-              {SECTIONS.map((s, i) => (
-                <button
-                  key={s.key}
-                  onClick={() => scrollToSection(i)}
-                  className={`flex flex-1 items-center justify-center gap-1.5 py-3 text-xs font-bold uppercase tracking-wider transition-all border-b-2 ${
-                    i === activeSectionIdx
-                      ? "border-teal-500 text-teal-600"
-                      : "border-transparent text-slate-400 hover:text-slate-600"
-                  }`}
-                >
-                  <span className={`flex h-5 w-5 items-center justify-center rounded-md text-[10px] font-black ${
-                    i === activeSectionIdx ? "bg-teal-500 text-white" : "bg-slate-200 text-slate-500"
-                  }`}>{s.prefix}</span>
-                  {s.label}
-                </button>
-              ))}
-            </div>
-
+            {/* ── Left: Product Vitrine ── */}
+          <div className="flex-1 overflow-y-auto px-4 py-4 lg:px-6 lg:py-5">
             <div className="mx-auto max-w-6xl space-y-6">
               {SECTIONS.map((section, sIdx) => {
                 const sectionProducts = products.filter((p) => p.category === section.key);
@@ -708,6 +621,38 @@ export default function MachinePage() {
           <div className="hidden w-[300px] shrink-0 border-l border-slate-200/60 bg-gradient-to-b from-slate-100 to-slate-200/80 p-5 lg:flex lg:flex-col lg:gap-4 lg:overflow-y-auto">
             <KeypadContent />
           </div>
+        </div>
+
+        {/* ═══ SCROLL ARROWS (always visible, bottom-left) ═══ */}
+        <div className="fixed bottom-6 left-5 z-40 flex flex-col gap-3 lg:bottom-8 lg:left-7">
+          <button
+            onClick={() => scrollToSection(activeSectionIdxRef.current - 1)}
+            disabled={activeSectionIdx === 0}
+            aria-label="Monter"
+            className={`flex h-14 w-14 items-center justify-center rounded-full shadow-xl transition-all duration-200 active:scale-90 ${
+              activeSectionIdx === 0
+                ? "bg-slate-200/60 text-slate-300 cursor-not-allowed shadow-none"
+                : "bg-white text-slate-700 hover:bg-teal-500 hover:text-white ring-1 ring-slate-200/80"
+            }`}
+          >
+            <svg className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+            </svg>
+          </button>
+          <button
+            onClick={() => scrollToSection(activeSectionIdxRef.current + 1)}
+            disabled={activeSectionIdx === SECTIONS.length - 1}
+            aria-label="Descendre"
+            className={`flex h-14 w-14 items-center justify-center rounded-full shadow-xl transition-all duration-200 active:scale-90 ${
+              activeSectionIdx === SECTIONS.length - 1
+                ? "bg-slate-200/60 text-slate-300 cursor-not-allowed shadow-none"
+                : "bg-white text-slate-700 hover:bg-teal-500 hover:text-white ring-1 ring-slate-200/80"
+            }`}
+          >
+            <svg className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
         </div>
 
         {/* ═══ MOBILE BOTTOM PANEL ═══ */}

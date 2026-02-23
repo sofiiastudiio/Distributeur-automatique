@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { QRCodeSVG } from "qrcode.react";
@@ -53,6 +53,9 @@ export default function MachinePage() {
 
   const [pendingProduct, setPendingProduct] = useState<Product | null>(null);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
+  const [activeSectionIdx, setActiveSectionIdx] = useState(0);
+  const sectionRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const touchStartY = useRef(0);
 
   const router = useRouter();
   const sessionId = useSessionStore((s) => s.sessionId);
@@ -107,6 +110,37 @@ export default function MachinePage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingProduct, credit, dispensing]);
+
+  const scrollToSection = useCallback((idx: number) => {
+    const clamped = Math.max(0, Math.min(SECTIONS.length - 1, idx));
+    setActiveSectionIdx(clamped);
+    sectionRefs.current[clamped]?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
+  // Track active section via IntersectionObserver
+  useEffect(() => {
+    const observers = sectionRefs.current.map((ref, idx) => {
+      if (!ref) return null;
+      const obs = new IntersectionObserver(
+        ([entry]) => { if (entry.isIntersecting) setActiveSectionIdx(idx); },
+        { threshold: 0.25 },
+      );
+      obs.observe(ref);
+      return obs;
+    });
+    return () => observers.forEach((obs) => obs?.disconnect());
+  }, [products]);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const delta = touchStartY.current - e.changedTouches[0].clientY;
+    if (Math.abs(delta) > 60) {
+      scrollToSection(activeSectionIdx + (delta > 0 ? 1 : -1));
+    }
+  }, [activeSectionIdx, scrollToSection]);
 
   const handleInsertMoney = useCallback((value: number, label: string) => {
     setInsertAnim(label);
@@ -471,14 +505,18 @@ export default function MachinePage() {
         <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
 
           {/* ── Left: Product Vitrine ── */}
-          <div className="flex-1 overflow-y-auto px-4 py-4 lg:px-6 lg:py-5">
+          <div
+            className="flex-1 overflow-y-auto px-4 py-4 lg:px-6 lg:py-5"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
             <div className="mx-auto max-w-6xl space-y-6">
-              {SECTIONS.map((section) => {
+              {SECTIONS.map((section, sIdx) => {
                 const sectionProducts = products.filter((p) => p.category === section.key);
                 if (sectionProducts.length === 0) return null;
 
                 return (
-                  <div key={section.key}>
+                  <div key={section.key} ref={(el) => { sectionRefs.current[sIdx] = el; }}>
                     <div className="mb-3 flex items-center gap-3">
                       <div className="flex h-7 items-center rounded-lg bg-gradient-to-r from-teal-500 to-emerald-500 px-3 shadow-sm shadow-teal-500/15">
                         <span className="font-mono text-[11px] font-bold text-white tracking-wider">{section.prefix}</span>
@@ -586,6 +624,57 @@ export default function MachinePage() {
           <div className="hidden w-[300px] shrink-0 border-l border-slate-200/60 bg-gradient-to-b from-slate-100 to-slate-200/80 p-5 lg:flex lg:flex-col lg:gap-4 lg:overflow-y-auto">
             <KeypadContent />
           </div>
+        </div>
+
+        {/* ═══ SECTION NAVIGATION ARROWS ═══ */}
+        <div className="fixed left-4 top-1/2 z-40 -translate-y-1/2 flex flex-col items-center gap-2 lg:left-6">
+          {/* Up arrow */}
+          <button
+            onClick={() => scrollToSection(activeSectionIdx - 1)}
+            disabled={activeSectionIdx === 0}
+            aria-label="Section précédente"
+            className={`flex h-14 w-14 items-center justify-center rounded-2xl shadow-xl transition-all duration-200 active:scale-95 ${
+              activeSectionIdx === 0
+                ? "bg-white/40 text-slate-300 cursor-not-allowed shadow-sm"
+                : "bg-white text-slate-700 hover:bg-teal-50 hover:text-teal-600 hover:shadow-teal-200/60 ring-1 ring-slate-200/80"
+            }`}
+          >
+            <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+            </svg>
+          </button>
+
+          {/* Section dots */}
+          <div className="flex flex-col items-center gap-1.5 py-1">
+            {SECTIONS.map((s, i) => (
+              <button
+                key={s.key}
+                onClick={() => scrollToSection(i)}
+                aria-label={s.label}
+                className={`rounded-full transition-all duration-200 ${
+                  i === activeSectionIdx
+                    ? "h-3 w-3 bg-teal-500 shadow shadow-teal-400/50"
+                    : "h-2 w-2 bg-slate-300 hover:bg-slate-400"
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* Down arrow */}
+          <button
+            onClick={() => scrollToSection(activeSectionIdx + 1)}
+            disabled={activeSectionIdx === SECTIONS.length - 1}
+            aria-label="Section suivante"
+            className={`flex h-14 w-14 items-center justify-center rounded-2xl shadow-xl transition-all duration-200 active:scale-95 ${
+              activeSectionIdx === SECTIONS.length - 1
+                ? "bg-white/40 text-slate-300 cursor-not-allowed shadow-sm"
+                : "bg-white text-slate-700 hover:bg-teal-50 hover:text-teal-600 hover:shadow-teal-200/60 ring-1 ring-slate-200/80"
+            }`}
+          >
+            <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
         </div>
 
         {/* ═══ MOBILE BOTTOM PANEL ═══ */}

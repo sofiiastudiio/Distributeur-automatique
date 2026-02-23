@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
 import type { Product } from "@/types";
+import { getTraceabilityForProduct } from "@/data/traceability";
 
 const DISTRIBUTORS = [
   { id: "SAFEBOX-A", label: "SafeBox A", sublabel: "Bâtiment A — RDC" },
@@ -337,6 +338,73 @@ export default function PWAPage() {
                       {certs.map((c: string) => (
                         <span key={c} className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-100">{c}</span>
                       ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Traceability */}
+              {(() => {
+                const trace = getTraceabilityForProduct(selectedProduct.id, products.map((p) => p.id));
+                if (!trace) return null;
+                return (
+                  <div>
+                    <div className="mb-3 flex items-center gap-2">
+                      <div className="h-px flex-1 bg-teal-100" />
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-teal-600">Traçabilité</h3>
+                      <div className="h-px flex-1 bg-teal-100" />
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Lot & dates */}
+                      <div className="rounded-xl bg-slate-50 px-4 py-3 space-y-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-400 font-medium">N° de lot</span>
+                          <span className="font-mono font-semibold text-slate-700">{trace.lot}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-400 font-medium">Fabriqué le</span>
+                          <span className="font-semibold text-slate-700">{trace.fabrication_date}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-400 font-medium">À consommer avant</span>
+                          <span className="font-semibold text-teal-600">{trace.dlc}</span>
+                        </div>
+                      </div>
+
+                      {/* Chain steps */}
+                      <div className="relative pl-6 space-y-5">
+                        <div className="absolute left-2.5 top-2 bottom-2 w-px bg-teal-200" />
+
+                        {/* Step 1 — Fournisseur */}
+                        <div className="relative">
+                          <div className="absolute -left-6 flex h-5 w-5 items-center justify-center rounded-full bg-teal-500 text-[10px] font-bold text-white shadow-sm shadow-teal-300">1</div>
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-teal-500 mb-0.5">Fournisseur</p>
+                          <p className="text-sm font-semibold text-slate-800">{trace.supplier}</p>
+                          <p className="text-xs text-slate-400">{trace.supplier_location}</p>
+                        </div>
+
+                        {/* Step 2 — Fabrication */}
+                        <div className="relative">
+                          <div className="absolute -left-6 flex h-5 w-5 items-center justify-center rounded-full bg-teal-500 text-[10px] font-bold text-white shadow-sm shadow-teal-300">2</div>
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-teal-500 mb-0.5">Fabrication</p>
+                          <p className="text-sm font-semibold text-slate-800">{trace.facility}</p>
+                          <p className="text-xs text-slate-400">{trace.facility_address}</p>
+                        </div>
+
+                        {/* Step 3 — Chaîne de température */}
+                        <div className="relative">
+                          <div className="absolute -left-6 flex h-5 w-5 items-center justify-center rounded-full bg-teal-500 text-[10px] font-bold text-white shadow-sm shadow-teal-300">3</div>
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-teal-500 mb-0.5">Chaîne de température</p>
+                          <p className="text-xs text-slate-600">{trace.temperature_chain}</p>
+                        </div>
+                      </div>
+
+                      {/* Storage */}
+                      <div className="rounded-xl bg-teal-50 px-4 py-3 ring-1 ring-teal-100">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-teal-500 mb-1">Conservation</p>
+                        <p className="text-xs text-slate-600">{trace.storage}</p>
+                      </div>
                     </div>
                   </div>
                 );

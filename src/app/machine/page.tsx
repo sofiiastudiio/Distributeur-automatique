@@ -55,7 +55,9 @@ export default function MachinePage() {
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
   const sectionRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef(0);
+  const activeSectionIdxRef = useRef(0);
 
   const router = useRouter();
   const sessionId = useSessionStore((s) => s.sessionId);
@@ -113,8 +115,14 @@ export default function MachinePage() {
 
   const scrollToSection = useCallback((idx: number) => {
     const clamped = Math.max(0, Math.min(SECTIONS.length - 1, idx));
+    activeSectionIdxRef.current = clamped;
     setActiveSectionIdx(clamped);
-    sectionRefs.current[clamped]?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const target = sectionRefs.current[clamped];
+    const container = scrollContainerRef.current;
+    if (target && container) {
+      const top = target.offsetTop - 16;
+      container.scrollTo({ top, behavior: "smooth" });
+    }
   }, []);
 
   // Track active section via IntersectionObserver
@@ -122,8 +130,13 @@ export default function MachinePage() {
     const observers = sectionRefs.current.map((ref, idx) => {
       if (!ref) return null;
       const obs = new IntersectionObserver(
-        ([entry]) => { if (entry.isIntersecting) setActiveSectionIdx(idx); },
-        { threshold: 0.25 },
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            activeSectionIdxRef.current = idx;
+            setActiveSectionIdx(idx);
+          }
+        },
+        { threshold: 0.3 },
       );
       obs.observe(ref);
       return obs;
@@ -135,12 +148,13 @@ export default function MachinePage() {
     touchStartY.current = e.touches[0].clientY;
   };
 
+  // Use ref to avoid stale closure on activeSectionIdx
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     const delta = touchStartY.current - e.changedTouches[0].clientY;
     if (Math.abs(delta) > 60) {
-      scrollToSection(activeSectionIdx + (delta > 0 ? 1 : -1));
+      scrollToSection(activeSectionIdxRef.current + (delta > 0 ? 1 : -1));
     }
-  }, [activeSectionIdx, scrollToSection]);
+  }, [scrollToSection]);
 
   const handleInsertMoney = useCallback((value: number, label: string) => {
     setInsertAnim(label);
@@ -506,6 +520,7 @@ export default function MachinePage() {
 
           {/* ── Left: Product Vitrine ── */}
           <div
+            ref={scrollContainerRef}
             className="flex-1 overflow-y-auto px-4 py-4 lg:px-6 lg:py-5"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
@@ -630,7 +645,7 @@ export default function MachinePage() {
         <div className="fixed left-4 top-1/2 z-40 -translate-y-1/2 flex flex-col items-center gap-2 lg:left-6">
           {/* Up arrow */}
           <button
-            onClick={() => scrollToSection(activeSectionIdx - 1)}
+            onClick={() => scrollToSection(activeSectionIdxRef.current - 1)}
             disabled={activeSectionIdx === 0}
             aria-label="Section précédente"
             className={`flex h-14 w-14 items-center justify-center rounded-2xl shadow-xl transition-all duration-200 active:scale-95 ${
@@ -662,7 +677,7 @@ export default function MachinePage() {
 
           {/* Down arrow */}
           <button
-            onClick={() => scrollToSection(activeSectionIdx + 1)}
+            onClick={() => scrollToSection(activeSectionIdxRef.current + 1)}
             disabled={activeSectionIdx === SECTIONS.length - 1}
             aria-label="Section suivante"
             className={`flex h-14 w-14 items-center justify-center rounded-2xl shadow-xl transition-all duration-200 active:scale-95 ${

@@ -54,9 +54,16 @@ export default function MachinePage() {
   const [pendingProduct, setPendingProduct] = useState<Product | null>(null);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
-  const sectionRefs = useRef<(HTMLDivElement | null)[]>([]);
   const activeSectionIdxRef = useRef(0);
   const isAnimating = useRef(false);
+  const vitrineRef = useRef<HTMLDivElement | null>(null);
+
+  /** Query section elements from the DOM (robust, no refs needed) */
+  const getSectionEls = useCallback(() => {
+    const el = vitrineRef.current;
+    if (!el) return [];
+    return Array.from(el.querySelectorAll<HTMLDivElement>("[data-section]"));
+  }, []);
 
   const router = useRouter();
   const sessionId = useSessionStore((s) => s.sessionId);
@@ -117,44 +124,39 @@ export default function MachinePage() {
     activeSectionIdxRef.current = clamped;
     setActiveSectionIdx(clamped);
     isAnimating.current = true;
-    const target = sectionRefs.current[clamped];
+
+    const sections = getSectionEls();
+    const target = sections[clamped];
     if (target) {
       const targetY = target.getBoundingClientRect().top + window.scrollY - 80;
-      const startY = window.scrollY;
-      const diff = targetY - startY;
-      const duration = 500;
-      let start: number | null = null;
-      const step = (ts: number) => {
-        if (!start) start = ts;
-        const progress = Math.min((ts - start) / duration, 1);
-        const ease = progress < 0.5
-          ? 2 * progress * progress
-          : -1 + (4 - 2 * progress) * progress;
-        window.scrollTo(0, startY + diff * ease);
-        if (progress < 1) {
-          requestAnimationFrame(step);
-        } else {
-          isAnimating.current = false;
-        }
-      };
-      requestAnimationFrame(step);
-    } else {
-      isAnimating.current = false;
+      window.scrollTo(0, targetY);
     }
-  }, []);
+    setTimeout(() => { isAnimating.current = false; }, 150);
+  }, [getSectionEls]);
 
   // Track active section via window scroll (paused during programmatic scroll)
   useEffect(() => {
     const onScroll = () => {
       if (isAnimating.current) return;
+      const sections = getSectionEls();
+      if (sections.length === 0) return;
+
+      // If near the bottom of the page, snap to last section
+      const atBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 50;
+      if (atBottom) {
+        const last = sections.length - 1;
+        if (activeSectionIdxRef.current !== last) {
+          activeSectionIdxRef.current = last;
+          setActiveSectionIdx(last);
+        }
+        return;
+      }
+
       const scrollY = window.scrollY + 120;
       let current = 0;
-      for (let i = 0; i < sectionRefs.current.length; i++) {
-        const ref = sectionRefs.current[i];
-        if (ref) {
-          const top = ref.getBoundingClientRect().top + window.scrollY;
-          if (top <= scrollY) current = i;
-        }
+      for (let i = 0; i < sections.length; i++) {
+        const top = sections[i].getBoundingClientRect().top + window.scrollY;
+        if (top <= scrollY) current = i;
       }
       if (activeSectionIdxRef.current !== current) {
         activeSectionIdxRef.current = current;
@@ -163,6 +165,60 @@ export default function MachinePage() {
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, [products, getSectionEls]);
+
+  // Touch-scroll support for external touch screens (e.g. Sirius via cable)
+  // Differentiates swipe (scroll) from tap (click) to prevent element selection
+  useEffect(() => {
+    const el = vitrineRef.current;
+    if (!el) return;
+
+    let startY = 0;
+    let startX = 0;
+    let isSwiping = false;
+    const TAP_THRESHOLD = 10; // px — movement beyond this = swipe, not tap
+
+    const onTouchStart = (e: TouchEvent) => {
+      const t = e.touches[0];
+      startY = t.clientY;
+      startX = t.clientX;
+      isSwiping = false;
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      const t = e.touches[0];
+      const dy = t.clientY - startY;
+      const dx = t.clientX - startX;
+
+      if (!isSwiping && Math.abs(dy) > TAP_THRESHOLD) {
+        isSwiping = true;
+      }
+
+      if (isSwiping) {
+        // Prevent text/element selection during swipe
+        e.preventDefault();
+        window.scrollBy(0, -dy);
+        startY = t.clientY;
+        startX = t.clientX;
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (isSwiping) {
+        // Swipe ended — block the tap/click that follows
+        e.preventDefault();
+      }
+      // If !isSwiping, it was a tap → let the click event fire normally
+    };
+
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd, { passive: false });
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+    };
   }, [products]);
 
   const handleInsertMoney = useCallback((value: number, label: string) => {
@@ -528,14 +584,14 @@ export default function MachinePage() {
         <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
 
             {/* ── Left: Product Vitrine ── */}
-          <div className="flex-1 overflow-y-auto px-4 py-4 lg:px-6 lg:py-5">
+          <div ref={vitrineRef} className="flex-1 select-none overflow-y-auto px-4 py-4 lg:px-6 lg:py-5" style={{ touchAction: "pan-y" }}>
             <div className="mx-auto max-w-6xl space-y-6">
               {SECTIONS.map((section, sIdx) => {
                 const sectionProducts = products.filter((p) => p.category === section.key);
                 if (sectionProducts.length === 0) return null;
 
                 return (
-                  <div key={section.key} ref={(el) => { sectionRefs.current[sIdx] = el; }}>
+                  <div key={section.key} data-section={sIdx}>
                     <div className="mb-3 flex items-center gap-3">
                       <div className="flex h-7 items-center rounded-lg bg-gradient-to-r from-teal-500 to-emerald-500 px-3 shadow-sm shadow-teal-500/15">
                         <span className="font-mono text-[11px] font-bold text-white tracking-wider">{section.prefix}</span>

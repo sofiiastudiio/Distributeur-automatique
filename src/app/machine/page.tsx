@@ -119,10 +119,28 @@ export default function MachinePage() {
     isAnimating.current = true;
     const target = sectionRefs.current[clamped];
     if (target) {
-      const top = target.getBoundingClientRect().top + window.scrollY - 80;
-      window.scrollTo({ top, behavior: "smooth" });
+      const targetY = target.getBoundingClientRect().top + window.scrollY - 80;
+      const startY = window.scrollY;
+      const diff = targetY - startY;
+      const duration = 500;
+      let start: number | null = null;
+      const step = (ts: number) => {
+        if (!start) start = ts;
+        const progress = Math.min((ts - start) / duration, 1);
+        const ease = progress < 0.5
+          ? 2 * progress * progress
+          : -1 + (4 - 2 * progress) * progress;
+        window.scrollTo(0, startY + diff * ease);
+        if (progress < 1) {
+          requestAnimationFrame(step);
+        } else {
+          isAnimating.current = false;
+        }
+      };
+      requestAnimationFrame(step);
+    } else {
+      isAnimating.current = false;
     }
-    setTimeout(() => { isAnimating.current = false; }, 900);
   }, []);
 
   // Track active section via window scroll (paused during programmatic scroll)

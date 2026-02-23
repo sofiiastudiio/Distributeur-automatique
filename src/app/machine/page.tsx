@@ -171,54 +171,87 @@ export default function MachinePage() {
     return () => container.removeEventListener("scroll", onScroll);
   }, [products, getSectionEls]);
 
-  // Touch-scroll support for external touch screens (e.g. Sirius via cable)
-  // Differentiates swipe (scroll) from tap (click) to prevent element selection
+  // Drag-to-scroll for external screens (Sirius via cable sends mouse events)
+  // Also handles native touch events as fallback
   useEffect(() => {
     const el = vitrineRef.current;
     if (!el) return;
 
     let startY = 0;
-    let startX = 0;
+    let isDragging = false;
+    let hasDragged = false;
+    const DRAG_THRESHOLD = 8;
+
+    // ── Mouse events (external touch screens send these) ──
+    const onMouseDown = (e: MouseEvent) => {
+      // Ignore clicks on buttons/inputs
+      if ((e.target as HTMLElement).closest("button, a, input, select")) return;
+      startY = e.clientY;
+      isDragging = true;
+      hasDragged = false;
+      el.style.cursor = "grab";
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+      const dy = e.clientY - startY;
+      if (!hasDragged && Math.abs(dy) > DRAG_THRESHOLD) {
+        hasDragged = true;
+        el.style.cursor = "grabbing";
+      }
+      if (hasDragged) {
+        e.preventDefault();
+        el.scrollBy(0, -dy);
+        startY = e.clientY;
+      }
+    };
+
+    const onMouseUp = (e: MouseEvent) => {
+      if (hasDragged) {
+        // Block the click that follows a drag
+        e.preventDefault();
+        const blockClick = (ev: Event) => { ev.stopPropagation(); ev.preventDefault(); };
+        el.addEventListener("click", blockClick, { capture: true, once: true });
+        setTimeout(() => el.removeEventListener("click", blockClick, { capture: true }), 50);
+      }
+      isDragging = false;
+      hasDragged = false;
+      el.style.cursor = "";
+    };
+
+    // ── Touch events (native touch devices) ──
+    let touchStartY = 0;
     let isSwiping = false;
-    const TAP_THRESHOLD = 10; // px — movement beyond this = swipe, not tap
 
     const onTouchStart = (e: TouchEvent) => {
-      const t = e.touches[0];
-      startY = t.clientY;
-      startX = t.clientX;
+      touchStartY = e.touches[0].clientY;
       isSwiping = false;
     };
 
     const onTouchMove = (e: TouchEvent) => {
-      const t = e.touches[0];
-      const dy = t.clientY - startY;
-      const dx = t.clientX - startX;
-
-      if (!isSwiping && Math.abs(dy) > TAP_THRESHOLD) {
-        isSwiping = true;
-      }
-
+      const dy = e.touches[0].clientY - touchStartY;
+      if (!isSwiping && Math.abs(dy) > DRAG_THRESHOLD) isSwiping = true;
       if (isSwiping) {
-        // Prevent text/element selection during swipe — scroll the vitrine container
         e.preventDefault();
         el.scrollBy(0, -dy);
-        startY = t.clientY;
-        startX = t.clientX;
+        touchStartY = e.touches[0].clientY;
       }
     };
 
     const onTouchEnd = (e: TouchEvent) => {
-      if (isSwiping) {
-        // Swipe ended — block the tap/click that follows
-        e.preventDefault();
-      }
-      // If !isSwiping, it was a tap → let the click event fire normally
+      if (isSwiping) e.preventDefault();
     };
 
+    el.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
     el.addEventListener("touchstart", onTouchStart, { passive: true });
     el.addEventListener("touchmove", onTouchMove, { passive: false });
     el.addEventListener("touchend", onTouchEnd, { passive: false });
     return () => {
+      el.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", onTouchEnd);

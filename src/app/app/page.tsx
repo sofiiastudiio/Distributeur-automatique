@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
 import type { Product } from "@/types";
 import { getTraceabilityForProduct } from "@/data/traceability";
+import { ALLERGENS } from "@/lib/constants";
 
 const DISTRIBUTORS = [
   { id: "SAFEBOX-A", label: "SafeBox A", sublabel: "Bâtiment A — RDC" },
@@ -43,6 +44,13 @@ function parseJson<T>(val: string | T): T {
   return val;
 }
 
+/** Returns the allergen ids from userAllergens that are NOT safe for this product */
+function getProductDangerousAllergens(product: Product, userAllergens: string[]): string[] {
+  if (userAllergens.length === 0) return [];
+  const allergenFree = parseJson<string[]>(product.allergen_free as unknown as string) ?? [];
+  return userAllergens.filter((a) => !allergenFree.includes(a));
+}
+
 export default function PWAPage() {
   const [distributorId, setDistributorId] = useState("SAFEBOX-A");
   const [products, setProducts] = useState<Product[]>([]);
@@ -50,6 +58,10 @@ export default function PWAPage() {
   const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<ProductDetail | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+
+  // Allergen state
+  const [userAllergens, setUserAllergens] = useState<string[]>([]);
+  const [allergensDone, setAllergensDone] = useState(false);
 
   const loadData = useCallback(async (distId: string) => {
     setLoading(true);
@@ -90,6 +102,89 @@ export default function PWAPage() {
   const availableCount = Object.values(stockMap).filter((q) => q > 0).length;
   const totalProducts = products.length;
 
+  const toggleAllergen = (id: string) => {
+    setUserAllergens((prev) =>
+      prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
+    );
+  };
+
+  // Allergen selection screen
+  if (!allergensDone) {
+    return (
+      <div className="min-h-dvh bg-gradient-to-br from-slate-50 via-white to-teal-50/30 flex flex-col pb-[env(safe-area-inset-bottom)]">
+        {/* Header */}
+        <div className="bg-white/95 backdrop-blur-xl shadow-sm pt-[env(safe-area-inset-top)]">
+          <div className="h-[3px] bg-gradient-to-r from-cyan-400 via-teal-500 to-emerald-500" />
+          <div className="px-4 py-3 flex items-center gap-3">
+            <SafeBoxLogo size={36} />
+            <div>
+              <h1 className="text-base font-extrabold text-slate-800 leading-none">
+                Safe<span className="text-teal-600">Box</span>
+              </h1>
+              <p className="text-[10px] text-teal-500 font-semibold uppercase tracking-wider">Stock en direct</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 px-4 py-6 flex flex-col">
+          <div className="mb-6 text-center">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-50 mb-3">
+              <span className="text-3xl">⚠️</span>
+            </div>
+            <h2 className="text-lg font-extrabold text-slate-800 mb-1">Intolérances alimentaires</h2>
+            <p className="text-sm text-slate-500">Sélectionnez vos intolérances pour filtrer les produits incompatibles.</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 mb-6">
+            {ALLERGENS.map((allergen) => {
+              const selected = userAllergens.includes(allergen.id);
+              return (
+                <button
+                  key={allergen.id}
+                  onClick={() => toggleAllergen(allergen.id)}
+                  className={`flex items-center gap-2.5 rounded-xl px-3 py-3 text-left transition-all active:scale-[0.97] ring-1 ${
+                    selected
+                      ? "bg-red-50 ring-red-300 shadow-sm"
+                      : "bg-white ring-slate-200 hover:ring-slate-300"
+                  }`}
+                >
+                  <span className="text-xl shrink-0">{allergen.icon}</span>
+                  <span className={`text-xs font-semibold leading-tight ${selected ? "text-red-700" : "text-slate-700"}`}>
+                    {allergen.label}
+                  </span>
+                  {selected && (
+                    <span className="ml-auto shrink-0 w-4 h-4 rounded-full bg-red-500 flex items-center justify-center">
+                      <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-auto space-y-2">
+            <button
+              onClick={() => setAllergensDone(true)}
+              className="w-full rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-500 py-4 text-sm font-bold text-white shadow-md shadow-teal-500/20 transition-all active:scale-95"
+            >
+              {userAllergens.length > 0
+                ? `Continuer avec ${userAllergens.length} intolérance${userAllergens.length > 1 ? "s" : ""}`
+                : "Continuer"}
+            </button>
+            <button
+              onClick={() => { setUserAllergens([]); setAllergensDone(true); }}
+              className="w-full rounded-2xl bg-slate-100 py-3 text-sm font-semibold text-slate-500 transition-all active:scale-95"
+            >
+              Aucune intolérance
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-dvh bg-gradient-to-br from-slate-50 via-white to-teal-50/30 pb-[env(safe-area-inset-bottom)]">
 
@@ -106,13 +201,27 @@ export default function PWAPage() {
               <p className="text-[10px] text-teal-500 font-semibold uppercase tracking-wider">Stock en direct</p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-slate-400">
-              {availableCount}/{totalProducts} dispo
-            </p>
-            <p className="text-[10px] text-slate-300">
-              {lastRefresh.toLocaleTimeString("fr-CH", { hour: "2-digit", minute: "2-digit" })}
-            </p>
+          <div className="flex items-center gap-2">
+            {/* Allergen filter indicator */}
+            <button
+              onClick={() => setAllergensDone(false)}
+              className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold transition-all ${
+                userAllergens.length > 0
+                  ? "bg-red-100 text-red-600 ring-1 ring-red-200"
+                  : "bg-slate-100 text-slate-400"
+              }`}
+            >
+              <span>⚠️</span>
+              <span>{userAllergens.length > 0 ? `${userAllergens.length} filtre${userAllergens.length > 1 ? "s" : ""}` : "Filtres"}</span>
+            </button>
+            <div className="text-right">
+              <p className="text-xs text-slate-400">
+                {availableCount}/{totalProducts} dispo
+              </p>
+              <p className="text-[10px] text-slate-300">
+                {lastRefresh.toLocaleTimeString("fr-CH", { hour: "2-digit", minute: "2-digit" })}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -155,12 +264,18 @@ export default function PWAPage() {
                   {sectionProducts.map((product) => {
                     const stock = stockMap[product.id] ?? null;
                     const isOut = stock !== null && stock === 0;
+                    const dangerousAllergens = getProductDangerousAllergens(product, userAllergens);
+                    const isDangerous = dangerousAllergens.length > 0;
                     return (
                       <button
                         key={product.id}
                         onClick={() => setSelectedProduct(product as unknown as ProductDetail)}
                         className={`relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 text-left transition-all active:scale-[0.97] ${
-                          isOut ? "opacity-50 grayscale ring-slate-100" : "ring-slate-200/60 hover:shadow-md"
+                          isOut
+                            ? "opacity-50 grayscale ring-slate-100"
+                            : isDangerous
+                              ? "opacity-40 grayscale ring-slate-100"
+                              : "ring-slate-200/60 hover:shadow-md"
                         }`}
                       >
                         {/* Image */}
@@ -197,6 +312,20 @@ export default function PWAPage() {
                             {product.price.toFixed(2)} <span className="text-[10px] font-medium text-slate-400">CHF</span>
                           </p>
                         </div>
+                        {/* Allergen badges */}
+                        {isDangerous && (
+                          <div className="px-3 pb-3 flex flex-wrap gap-1">
+                            {dangerousAllergens.map((aid) => {
+                              const allergen = ALLERGENS.find((a) => a.id === aid);
+                              return allergen ? (
+                                <span key={aid} className="flex items-center gap-0.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-700">
+                                  <span>{allergen.icon}</span>
+                                  <span>{allergen.label.split(" ")[0]}</span>
+                                </span>
+                              ) : null;
+                            })}
+                          </div>
+                        )}
                       </button>
                     );
                   })}
@@ -216,203 +345,221 @@ export default function PWAPage() {
       )}
 
       {/* Product detail modal */}
-      {selectedProduct && (
-        <div className="fixed inset-0 z-50 flex items-end">
-          <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setSelectedProduct(null)}
-          />
-          <div className="relative z-10 w-full max-h-[85dvh] overflow-y-auto rounded-t-3xl bg-white shadow-2xl pb-[env(safe-area-inset-bottom)]">
-            {/* Handle */}
-            <div className="sticky top-0 bg-white pt-3 pb-2 px-4 border-b border-slate-100">
-              <div className="mx-auto mb-2 h-1 w-12 rounded-full bg-slate-200" />
-              <div className="flex items-center justify-between">
-                <h2 className="text-base font-bold text-slate-800 pr-4 line-clamp-1">{selectedProduct.name}</h2>
-                <button
-                  onClick={() => setSelectedProduct(null)}
-                  className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-400 active:bg-slate-200"
-                >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <div className="px-4 pb-8 pt-4 space-y-5">
-              {/* Image + price */}
-              <div className="flex items-center gap-4">
-                <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-slate-50">
-                  <Image src={selectedProduct.image_url} alt={selectedProduct.name} fill className="object-contain p-2" sizes="96px" />
-                </div>
-                <div>
-                  <p className="text-xl font-extrabold text-slate-800">{selectedProduct.price.toFixed(2)} <span className="text-sm font-medium text-slate-400">CHF</span></p>
-                  <div className="mt-1 flex gap-1 flex-wrap">
-                    {selectedProduct.is_vegan && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Végan</span>}
-                    {selectedProduct.is_vegetarian && <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">Végétarien</span>}
-                  </div>
-                  {(() => {
-                    const stock = stockMap[selectedProduct.id] ?? null;
-                    if (stock === null) return null;
-                    const isOut = stock === 0;
-                    return (
-                      <div className={`mt-2 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${
-                        isOut ? "bg-red-100 text-red-600" : stock <= 3 ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-600"
-                      }`}>
-                        {isOut ? "Épuisé" : `${stock} en stock`}
-                      </div>
-                    );
-                  })()}
+      {selectedProduct && (() => {
+        const modalDangerousAllergens = getProductDangerousAllergens(selectedProduct as unknown as Product, userAllergens);
+        return (
+          <div className="fixed inset-0 z-50 flex items-end">
+            <div
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setSelectedProduct(null)}
+            />
+            <div className="relative z-10 w-full max-h-[85dvh] overflow-y-auto rounded-t-3xl bg-white shadow-2xl pb-[env(safe-area-inset-bottom)]">
+              {/* Handle */}
+              <div className="sticky top-0 bg-white pt-3 pb-2 px-4 border-b border-slate-100">
+                <div className="mx-auto mb-2 h-1 w-12 rounded-full bg-slate-200" />
+                <div className="flex items-center justify-between">
+                  <h2 className="text-base font-bold text-slate-800 pr-4 line-clamp-1">{selectedProduct.name}</h2>
+                  <button
+                    onClick={() => setSelectedProduct(null)}
+                    className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-400 active:bg-slate-200"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
               </div>
 
-              {/* Description */}
-              {selectedProduct.description && (
-                <div>
-                  <h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Description</h3>
-                  <p className="text-sm text-slate-600">{selectedProduct.description}</p>
-                </div>
-              )}
-
-              {/* Ingredients */}
-              {selectedProduct.ingredients && (
-                <div>
-                  <h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Ingrédients</h3>
-                  <p className="text-sm text-slate-600">{selectedProduct.ingredients}</p>
-                </div>
-              )}
-
-              {/* Allergen free */}
-              {(() => {
-                const allergenFree = parseJson<string[]>(selectedProduct.allergen_free as string);
-                if (!allergenFree || allergenFree.length === 0) return null;
-                return (
-                  <div>
-                    <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Sans allergènes</h3>
-                    <div className="flex flex-wrap gap-1.5">
-                      {allergenFree.map((a: string) => (
-                        <span key={a} className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-700 ring-1 ring-teal-100">
-                          {a.replace(/-/g, " ")}
+              {/* Allergen warning banner */}
+              {modalDangerousAllergens.length > 0 && (
+                <div className="mx-4 mt-4 rounded-xl bg-red-50 ring-1 ring-red-200 px-4 py-3">
+                  <p className="text-xs font-bold text-red-700 mb-1.5">⚠️ Contient des allergènes que vous avez déclarés :</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {modalDangerousAllergens.map((aid) => {
+                      const allergen = ALLERGENS.find((a) => a.id === aid);
+                      return allergen ? (
+                        <span key={aid} className="flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
+                          <span>{allergen.icon}</span>
+                          <span>{allergen.label}</span>
                         </span>
-                      ))}
-                    </div>
+                      ) : null;
+                    })}
                   </div>
-                );
-              })()}
-
-              {/* Nutritional info */}
-              {(() => {
-                const nutri = parseJson<Record<string, string>>(selectedProduct.nutritional_info as string);
-                if (!nutri || typeof nutri !== "object" || Object.keys(nutri).length === 0) return null;
-                return (
-                  <div>
-                    <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Infos nutritionnelles</h3>
-                    <div className="rounded-xl bg-slate-50 p-3 space-y-1">
-                      {Object.entries(nutri).map(([k, v]) => (
-                        <div key={k} className="flex justify-between text-xs">
-                          <span className="text-slate-500 capitalize">{k.replace(/_/g, " ")}</span>
-                          <span className="font-semibold text-slate-700">{v}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Origin */}
-              {selectedProduct.origin_info && (
-                <div>
-                  <h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Traçabilité & origine</h3>
-                  <p className="text-sm text-slate-600">{selectedProduct.origin_info}</p>
                 </div>
               )}
 
-              {/* Certifications */}
-              {(() => {
-                const certs = parseJson<string[]>(selectedProduct.certifications as string);
-                if (!certs || certs.length === 0) return null;
-                return (
-                  <div>
-                    <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Certifications</h3>
-                    <div className="flex flex-wrap gap-1.5">
-                      {certs.map((c: string) => (
-                        <span key={c} className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-100">{c}</span>
-                      ))}
-                    </div>
+              <div className="px-4 pb-8 pt-4 space-y-5">
+                {/* Image + price */}
+                <div className="flex items-center gap-4">
+                  <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-slate-50">
+                    <Image src={selectedProduct.image_url} alt={selectedProduct.name} fill className="object-contain p-2" sizes="96px" />
                   </div>
-                );
-              })()}
-
-              {/* Traceability */}
-              {(() => {
-                const trace = getTraceabilityForProduct(selectedProduct.id, products.map((p) => p.id));
-                if (!trace) return null;
-                return (
                   <div>
-                    <div className="mb-3 flex items-center gap-2">
-                      <div className="h-px flex-1 bg-teal-100" />
-                      <h3 className="text-xs font-bold uppercase tracking-widest text-teal-600">Traçabilité</h3>
-                      <div className="h-px flex-1 bg-teal-100" />
+                    <p className="text-xl font-extrabold text-slate-800">{selectedProduct.price.toFixed(2)} <span className="text-sm font-medium text-slate-400">CHF</span></p>
+                    <div className="mt-1 flex gap-1 flex-wrap">
+                      {selectedProduct.is_vegan && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Végan</span>}
+                      {selectedProduct.is_vegetarian && <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">Végétarien</span>}
                     </div>
-
-                    <div className="space-y-4">
-                      {/* Lot & dates */}
-                      <div className="rounded-xl bg-slate-50 px-4 py-3 space-y-1.5">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-slate-400 font-medium">N° de lot</span>
-                          <span className="font-mono font-semibold text-slate-700">{trace.lot}</span>
+                    {(() => {
+                      const stock = stockMap[selectedProduct.id] ?? null;
+                      if (stock === null) return null;
+                      const isOut = stock === 0;
+                      return (
+                        <div className={`mt-2 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${
+                          isOut ? "bg-red-100 text-red-600" : stock <= 3 ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-600"
+                        }`}>
+                          {isOut ? "Épuisé" : `${stock} en stock`}
                         </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="text-slate-400 font-medium">Fabriqué le</span>
-                          <span className="font-semibold text-slate-700">{trace.fabrication_date}</span>
-                        </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="text-slate-400 font-medium">À consommer avant</span>
-                          <span className="font-semibold text-teal-600">{trace.dlc}</span>
-                        </div>
-                      </div>
-
-                      {/* Chain steps */}
-                      <div className="relative pl-6 space-y-5">
-                        <div className="absolute left-2.5 top-2 bottom-2 w-px bg-teal-200" />
-
-                        {/* Step 1 — Fournisseur */}
-                        <div className="relative">
-                          <div className="absolute -left-6 flex h-5 w-5 items-center justify-center rounded-full bg-teal-500 text-[10px] font-bold text-white shadow-sm shadow-teal-300">1</div>
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-teal-500 mb-0.5">Fournisseur</p>
-                          <p className="text-sm font-semibold text-slate-800">{trace.supplier}</p>
-                          <p className="text-xs text-slate-400">{trace.supplier_location}</p>
-                        </div>
-
-                        {/* Step 2 — Fabrication */}
-                        <div className="relative">
-                          <div className="absolute -left-6 flex h-5 w-5 items-center justify-center rounded-full bg-teal-500 text-[10px] font-bold text-white shadow-sm shadow-teal-300">2</div>
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-teal-500 mb-0.5">Fabrication</p>
-                          <p className="text-sm font-semibold text-slate-800">{trace.facility}</p>
-                          <p className="text-xs text-slate-400">{trace.facility_address}</p>
-                        </div>
-
-                        {/* Step 3 — Chaîne de température */}
-                        <div className="relative">
-                          <div className="absolute -left-6 flex h-5 w-5 items-center justify-center rounded-full bg-teal-500 text-[10px] font-bold text-white shadow-sm shadow-teal-300">3</div>
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-teal-500 mb-0.5">Chaîne de température</p>
-                          <p className="text-xs text-slate-600">{trace.temperature_chain}</p>
-                        </div>
-                      </div>
-
-                      {/* Storage */}
-                      <div className="rounded-xl bg-teal-50 px-4 py-3 ring-1 ring-teal-100">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-teal-500 mb-1">Conservation</p>
-                        <p className="text-xs text-slate-600">{trace.storage}</p>
-                      </div>
-                    </div>
+                      );
+                    })()}
                   </div>
-                );
-              })()}
+                </div>
+
+                {/* Description */}
+                {selectedProduct.description && (
+                  <div>
+                    <h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Description</h3>
+                    <p className="text-sm text-slate-600">{selectedProduct.description}</p>
+                  </div>
+                )}
+
+                {/* Ingredients */}
+                {selectedProduct.ingredients && (
+                  <div>
+                    <h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Ingrédients</h3>
+                    <p className="text-sm text-slate-600">{selectedProduct.ingredients}</p>
+                  </div>
+                )}
+
+                {/* Allergen free */}
+                {(() => {
+                  const allergenFree = parseJson<string[]>(selectedProduct.allergen_free as string);
+                  if (!allergenFree || allergenFree.length === 0) return null;
+                  return (
+                    <div>
+                      <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Sans allergènes</h3>
+                      <div className="flex flex-wrap gap-1.5">
+                        {allergenFree.map((a: string) => (
+                          <span key={a} className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-700 ring-1 ring-teal-100">
+                            {a.replace(/-/g, " ")}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Nutritional info */}
+                {(() => {
+                  const nutri = parseJson<Record<string, string>>(selectedProduct.nutritional_info as string);
+                  if (!nutri || typeof nutri !== "object" || Object.keys(nutri).length === 0) return null;
+                  return (
+                    <div>
+                      <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Infos nutritionnelles</h3>
+                      <div className="rounded-xl bg-slate-50 p-3 space-y-1">
+                        {Object.entries(nutri).map(([k, v]) => (
+                          <div key={k} className="flex justify-between text-xs">
+                            <span className="text-slate-500 capitalize">{k.replace(/_/g, " ")}</span>
+                            <span className="font-semibold text-slate-700">{v}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Origin */}
+                {selectedProduct.origin_info && (
+                  <div>
+                    <h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Traçabilité & origine</h3>
+                    <p className="text-sm text-slate-600">{selectedProduct.origin_info}</p>
+                  </div>
+                )}
+
+                {/* Certifications */}
+                {(() => {
+                  const certs = parseJson<string[]>(selectedProduct.certifications as string);
+                  if (!certs || certs.length === 0) return null;
+                  return (
+                    <div>
+                      <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Certifications</h3>
+                      <div className="flex flex-wrap gap-1.5">
+                        {certs.map((c: string) => (
+                          <span key={c} className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-100">{c}</span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Traceability */}
+                {(() => {
+                  const trace = getTraceabilityForProduct(selectedProduct.id, products.map((p) => p.id));
+                  if (!trace) return null;
+                  return (
+                    <div>
+                      <div className="mb-3 flex items-center gap-2">
+                        <div className="h-px flex-1 bg-teal-100" />
+                        <h3 className="text-xs font-bold uppercase tracking-widest text-teal-600">Traçabilité</h3>
+                        <div className="h-px flex-1 bg-teal-100" />
+                      </div>
+
+                      <div className="space-y-4">
+                        {/* Lot & dates */}
+                        <div className="rounded-xl bg-slate-50 px-4 py-3 space-y-1.5">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-400 font-medium">N° de lot</span>
+                            <span className="font-mono font-semibold text-slate-700">{trace.lot}</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-400 font-medium">Fabriqué le</span>
+                            <span className="font-semibold text-slate-700">{trace.fabrication_date}</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-400 font-medium">À consommer avant</span>
+                            <span className="font-semibold text-teal-600">{trace.dlc}</span>
+                          </div>
+                        </div>
+
+                        {/* Chain steps */}
+                        <div className="relative pl-6 space-y-5">
+                          <div className="absolute left-2.5 top-2 bottom-2 w-px bg-teal-200" />
+
+                          <div className="relative">
+                            <div className="absolute -left-6 flex h-5 w-5 items-center justify-center rounded-full bg-teal-500 text-[10px] font-bold text-white shadow-sm shadow-teal-300">1</div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-teal-500 mb-0.5">Fournisseur</p>
+                            <p className="text-sm font-semibold text-slate-800">{trace.supplier}</p>
+                            <p className="text-xs text-slate-400">{trace.supplier_location}</p>
+                          </div>
+
+                          <div className="relative">
+                            <div className="absolute -left-6 flex h-5 w-5 items-center justify-center rounded-full bg-teal-500 text-[10px] font-bold text-white shadow-sm shadow-teal-300">2</div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-teal-500 mb-0.5">Fabrication</p>
+                            <p className="text-sm font-semibold text-slate-800">{trace.facility}</p>
+                            <p className="text-xs text-slate-400">{trace.facility_address}</p>
+                          </div>
+
+                          <div className="relative">
+                            <div className="absolute -left-6 flex h-5 w-5 items-center justify-center rounded-full bg-teal-500 text-[10px] font-bold text-white shadow-sm shadow-teal-300">3</div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-teal-500 mb-0.5">Chaîne de température</p>
+                            <p className="text-xs text-slate-600">{trace.temperature_chain}</p>
+                          </div>
+                        </div>
+
+                        {/* Storage */}
+                        <div className="rounded-xl bg-teal-50 px-4 py-3 ring-1 ring-teal-100">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-teal-500 mb-1">Conservation</p>
+                          <p className="text-xs text-slate-600">{trace.storage}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

@@ -56,6 +56,7 @@ export default function MachinePage() {
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
   const sectionRefs = useRef<(HTMLDivElement | null)[]>([]);
   const activeSectionIdxRef = useRef(0);
+  const isAnimating = useRef(false);
 
   const router = useRouter();
   const sessionId = useSessionStore((s) => s.sessionId);
@@ -115,16 +116,19 @@ export default function MachinePage() {
     const clamped = Math.max(0, Math.min(SECTIONS.length - 1, idx));
     activeSectionIdxRef.current = clamped;
     setActiveSectionIdx(clamped);
+    isAnimating.current = true;
     const target = sectionRefs.current[clamped];
     if (target) {
       const top = target.getBoundingClientRect().top + window.scrollY - 80;
       window.scrollTo({ top, behavior: "smooth" });
     }
+    setTimeout(() => { isAnimating.current = false; }, 900);
   }, []);
 
-  // Track active section via window scroll
+  // Track active section via window scroll (paused during programmatic scroll)
   useEffect(() => {
     const onScroll = () => {
+      if (isAnimating.current) return;
       const scrollY = window.scrollY + 120;
       let current = 0;
       for (let i = 0; i < sectionRefs.current.length; i++) {

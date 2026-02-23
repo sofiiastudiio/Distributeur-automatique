@@ -21,7 +21,7 @@ export const ALLERGENS = [
   { id: "poisson", label: "Poisson", icon: "🐟", color: "#2563EB" },
   { id: "arachides", label: "Arachides", icon: "🥜", color: "#92400E" },
   { id: "soja", label: "Soja", icon: "🫘", color: "#65A30D" },
-  { id: "lait", label: "Lait", icon: "🥛", color: "#F3F4F6" },
+  { id: "lait", label: "Lait (incl. lactose)", icon: "🥛", color: "#F3F4F6" },
   { id: "fruits-a-coque", label: "Fruits à coque", icon: "🌰", color: "#78350F" },
   { id: "celeri", label: "Céleri", icon: "🥬", color: "#16A34A" },
   { id: "moutarde", label: "Moutarde", icon: "🟡", color: "#CA8A04" },

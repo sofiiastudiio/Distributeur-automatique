@@ -94,6 +94,20 @@ export default function MachinePage() {
     fetch("/api/products").then((r) => r.json()).then(setProducts);
   }, []);
 
+  // Create anonymous session if none exists (onboarding now happens after)
+  const setSession = useSessionStore((s) => s.setSession);
+  useEffect(() => {
+    if (sessionId) return;
+    fetch("/api/participants", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ distributor_id: distributorId }),
+    })
+      .then((r) => r.json())
+      .then((data) => { if (data.session_id) setSession(data.session_id, data.participant_id, distributorId); })
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     loadStock();
   }, [loadStock]);
@@ -268,7 +282,7 @@ export default function MachinePage() {
   const handleFinish = useCallback(() => {
     track("session_end", { metadata: { total_spent: amountSpent, remaining: budget - amountSpent } });
     flush();
-    router.push("/feedback");
+    router.push("/onboarding");
   }, [track, flush, router, amountSpent, budget]);
 
   const handleProductClick = (sectionPrefix: string, idx: number, product: Product) => {
@@ -665,10 +679,10 @@ export default function MachinePage() {
                             </div>
 
                             {/* QR code badge */}
-                            <div className="absolute top-2.5 right-2.5 z-20 rounded-md bg-white/90 p-1 shadow-sm backdrop-blur-sm ring-1 ring-black/[0.05]" title="Scanner pour voir ingrédients & traçabilité">
+                            <div className="absolute top-2 right-2 z-20 rounded-lg bg-white/95 p-1.5 shadow-md backdrop-blur-sm ring-1 ring-black/[0.06]" title="Scanner pour voir ingrédients & traçabilité">
                               <QRCodeSVG
                                 value={`${typeof window !== "undefined" ? window.location.origin : ""}/produit/${product.id}`}
-                                size={28}
+                                size={56}
                                 level="L"
                               />
                             </div>

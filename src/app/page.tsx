@@ -101,7 +101,7 @@ export default function WelcomePage() {
         {/* CTA Button */}
         <div className={`transition-all duration-1000 delay-500 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
           <button
-            onClick={() => router.push("/onboarding")}
+            onClick={() => router.push("/machine")}
             className="group relative overflow-hidden rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-500 px-14 py-5 text-lg font-bold text-white shadow-xl shadow-teal-500/20 transition-all duration-300 hover:shadow-2xl hover:shadow-teal-500/30 hover:scale-[1.03] active:scale-[0.98]"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-teal-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />

@@ -11,7 +11,7 @@ import {
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const setSession = useSessionStore((s) => s.setSession);
+  const participantId = useSessionStore((s) => s.participantId);
   const distributorId = useSessionStore((s) => s.distributorId);
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -31,18 +31,22 @@ export default function OnboardingPage() {
     setSubmitting(true);
     setError("");
     try {
-      const res = await fetch("/api/participants", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, distributor_id: distributorId }),
-      });
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`Erreur ${res.status}: ${text || res.statusText}`);
+      if (participantId) {
+        // Update existing participant created during machine session
+        await fetch(`/api/participants/${participantId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+      } else {
+        // Fallback: create new participant if none exists
+        await fetch("/api/participants", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...form, distributor_id: distributorId }),
+        });
       }
-      const data = await res.json();
-      setSession(data.session_id, data.participant_id, distributorId);
-      router.push("/machine");
+      router.push("/feedback");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur de connexion");
       setSubmitting(false);
@@ -179,7 +183,7 @@ export default function OnboardingPage() {
                 disabled={submitting}
                 className="w-full rounded-xl bg-accent px-8 py-3 font-semibold text-background transition-all hover:bg-accent-light active:scale-95 disabled:opacity-40"
               >
-                {submitting ? "Chargement..." : "Accéder au distributeur"}
+                {submitting ? "Chargement..." : "Terminer"}
               </button>
               <div className="flex items-center justify-between">
                 <button

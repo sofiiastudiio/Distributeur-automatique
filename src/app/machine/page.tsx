@@ -125,24 +125,27 @@ export default function MachinePage() {
     setActiveSectionIdx(clamped);
     isAnimating.current = true;
 
+    const container = vitrineRef.current;
     const sections = getSectionEls();
     const target = sections[clamped];
-    if (target) {
-      const targetY = target.getBoundingClientRect().top + window.scrollY - 80;
-      window.scrollTo(0, targetY);
+    if (container && target) {
+      const targetY = target.offsetTop - container.offsetTop;
+      container.scrollTo(0, targetY);
     }
     setTimeout(() => { isAnimating.current = false; }, 150);
   }, [getSectionEls]);
 
-  // Track active section via window scroll (paused during programmatic scroll)
+  // Track active section via container scroll (paused during programmatic scroll)
   useEffect(() => {
+    const container = vitrineRef.current;
+    if (!container) return;
     const onScroll = () => {
       if (isAnimating.current) return;
       const sections = getSectionEls();
       if (sections.length === 0) return;
 
-      // If near the bottom of the page, snap to last section
-      const atBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 50;
+      // If near the bottom of the container, snap to last section
+      const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 50;
       if (atBottom) {
         const last = sections.length - 1;
         if (activeSectionIdxRef.current !== last) {
@@ -152,19 +155,20 @@ export default function MachinePage() {
         return;
       }
 
-      const scrollY = window.scrollY + 120;
+      const scrollTop = container.scrollTop + 40;
       let current = 0;
       for (let i = 0; i < sections.length; i++) {
-        const top = sections[i].getBoundingClientRect().top + window.scrollY;
-        if (top <= scrollY) current = i;
+        const el = sections[i] as HTMLElement;
+        const top = el.offsetTop - container.offsetTop;
+        if (top <= scrollTop) current = i;
       }
       if (activeSectionIdxRef.current !== current) {
         activeSectionIdxRef.current = current;
         setActiveSectionIdx(current);
       }
     };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    container.addEventListener("scroll", onScroll, { passive: true });
+    return () => container.removeEventListener("scroll", onScroll);
   }, [products, getSectionEls]);
 
   // Touch-scroll support for external touch screens (e.g. Sirius via cable)
@@ -195,9 +199,9 @@ export default function MachinePage() {
       }
 
       if (isSwiping) {
-        // Prevent text/element selection during swipe
+        // Prevent text/element selection during swipe — scroll the vitrine container
         e.preventDefault();
-        window.scrollBy(0, -dy);
+        el.scrollBy(0, -dy);
         startY = t.clientY;
         startX = t.clientX;
       }
@@ -510,8 +514,8 @@ export default function MachinePage() {
   );
 
   return (
-    <div className="flex min-h-dvh flex-col bg-gradient-to-br from-slate-50 via-white to-cyan-50/30">
-      <div className="flex flex-1 flex-col">
+    <div className="flex h-dvh flex-col overflow-hidden bg-gradient-to-br from-slate-50 via-white to-cyan-50/30">
+      <div className="flex min-h-0 flex-1 flex-col">
 
         {/* ═══ TOP BAR ═══ */}
         <div className="relative overflow-hidden bg-white/90 backdrop-blur-xl shadow-[0_1px_30px_rgba(0,0,0,0.06)]">

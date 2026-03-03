@@ -161,14 +161,7 @@ export default function OnboardingPage() {
         {/* Fixed bottom buttons */}
         <div className="mt-4 shrink-0">
           {step === 0 ? (
-            <div className="flex items-center justify-between">
-              <button
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="rounded-xl px-5 py-3 text-sm font-medium text-foreground/50 transition-colors hover:bg-surface-light active:scale-95"
-              >
-                Passer
-              </button>
+            <div className="flex justify-end">
               <button
                 onClick={() => setStep(step + 1)}
                 className="rounded-xl bg-primary px-8 py-3 font-semibold text-white transition-all hover:bg-primary-light active:scale-95"
@@ -185,21 +178,12 @@ export default function OnboardingPage() {
               >
                 {submitting ? "Chargement..." : "Terminer"}
               </button>
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={() => setStep(step - 1)}
-                  className="rounded-xl px-5 py-2 text-sm font-medium text-foreground/70 transition-colors hover:bg-surface-light"
-                >
-                  Retour
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  className="rounded-xl px-5 py-2 text-sm font-medium text-foreground/50 transition-colors hover:bg-surface-light active:scale-95"
-                >
-                  Passer
-                </button>
-              </div>
+              <button
+                onClick={() => setStep(step - 1)}
+                className="rounded-xl px-5 py-2 text-sm font-medium text-foreground/70 transition-colors hover:bg-surface-light"
+              >
+                Retour
+              </button>
             </div>
           )}
         </div>

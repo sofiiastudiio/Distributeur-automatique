@@ -453,11 +453,23 @@ export default function PWAPage() {
                 {(() => {
                   const nutri = parseJson<Record<string, string>>(selectedProduct.nutritional_info as string);
                   if (!nutri || typeof nutri !== "object" || Object.keys(nutri).length === 0) return null;
+                  const { net_weight, per, ...values } = nutri as Record<string, string>;
                   return (
                     <div>
-                      <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Infos nutritionnelles</h3>
+                      <div className="mb-2 flex items-center justify-between">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Infos nutritionnelles</h3>
+                        {net_weight && (
+                          <span className="text-xs font-semibold text-slate-500">{net_weight}</span>
+                        )}
+                      </div>
                       <div className="rounded-xl bg-slate-50 p-3 space-y-1">
-                        {Object.entries(nutri).map(([k, v]) => (
+                        {per && (
+                          <div className="pb-1 mb-1 border-b border-slate-200 flex justify-between text-xs text-slate-400">
+                            <span>Pour</span>
+                            <span>{per}</span>
+                          </div>
+                        )}
+                        {Object.entries(values).map(([k, v]) => (
                           <div key={k} className="flex justify-between text-xs">
                             <span className="text-slate-500 capitalize">{k.replace(/_/g, " ")}</span>
                             <span className="font-semibold text-slate-700">{v}</span>

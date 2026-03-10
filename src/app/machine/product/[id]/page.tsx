@@ -66,6 +66,9 @@ export default function ProductDetailPage() {
           />
           <div>
             <h1 className="mb-2 text-3xl font-bold">{product.name}</h1>
+            {ni.net_weight && (
+              <p className="mb-1 text-sm font-medium text-foreground/40">{ni.net_weight}</p>
+            )}
             <p className="mb-3 text-lg text-foreground/60">{product.description}</p>
             <div className="mb-3 text-3xl font-bold text-accent">
               CHF {product.price.toFixed(2)}
@@ -156,12 +159,16 @@ export default function ProductDetailPage() {
         </div>
 
         {/* QR Code */}
-        <div className="flex justify-center">
-          <div className="rounded-xl bg-white p-4">
+        <div className="flex flex-col items-center gap-3">
+          <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.06]">
             <QRCodeSVG
-              value={`${typeof window !== "undefined" ? window.location.origin : ""}/machine/product/${product.id}`}
+              value={`${typeof window !== "undefined" ? window.location.origin : ""}/produit/${product.id}`}
               size={120}
             />
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-semibold text-foreground/70">📱 Scannez avec votre téléphone</p>
+            <p className="text-xs text-foreground/40">Ingrédients complets, traçabilité & certifications</p>
           </div>
         </div>
       </div>

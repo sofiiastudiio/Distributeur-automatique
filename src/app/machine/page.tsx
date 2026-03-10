@@ -631,6 +631,21 @@ export default function MachinePage() {
           </div>
         </div>
 
+        {/* ═══ QR INFO BANNER ═══ */}
+        <div className="flex items-center justify-center gap-2.5 bg-teal-600 px-4 py-2">
+          <svg className="h-4 w-4 shrink-0 text-teal-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+            <path d="M14 14h2v2h-2zM18 14h3M14 18h2M18 18h3M14 21v1M18 18v3"/>
+          </svg>
+          <p className="text-center text-xs font-semibold text-white">
+            Scannez le QR code d&apos;un produit avec votre téléphone pour voir les ingrédients, allergènes et traçabilité
+          </p>
+          <svg className="h-4 w-4 shrink-0 text-teal-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+            <path d="M14 14h2v2h-2zM18 14h3M14 18h2M18 18h3M14 21v1M18 18v3"/>
+          </svg>
+        </div>
+
         {/* ═══ MAIN CONTENT ═══ */}
         <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
 
@@ -679,12 +694,17 @@ export default function MachinePage() {
                             </div>
 
                             {/* QR code badge */}
-                            <div className="absolute top-2 right-2 z-20 rounded-lg bg-white/95 p-1.5 shadow-md backdrop-blur-sm ring-1 ring-black/[0.06]" title="Scanner pour voir ingrédients & traçabilité">
-                              <QRCodeSVG
-                                value={`${typeof window !== "undefined" ? window.location.origin : ""}/produit/${product.id}`}
-                                size={56}
-                                level="L"
-                              />
+                            <div className="absolute top-2 right-2 z-20 flex flex-col items-center gap-1 rounded-xl bg-teal-600 px-2 pt-2 pb-1.5 shadow-lg">
+                              <div className="rounded-md bg-white p-1">
+                                <QRCodeSVG
+                                  value={`${typeof window !== "undefined" ? window.location.origin : ""}/produit/${product.id}`}
+                                  size={44}
+                                  level="L"
+                                />
+                              </div>
+                              <span className="text-[8px] font-bold text-teal-100 tracking-wide uppercase leading-tight">
+                                📱 Scanner
+                              </span>
                             </div>
 
                             {/* Product photo */}
@@ -725,6 +745,11 @@ export default function MachinePage() {
                               <p className="mb-1 text-left text-sm font-bold leading-snug text-slate-800 line-clamp-2">
                                 {product.name}
                               </p>
+                              {product.nutritional_info?.net_weight && (
+                                <p className="mb-1 text-left text-xs text-slate-400">
+                                  {product.nutritional_info.net_weight}
+                                </p>
+                              )}
 
                               <div className="mt-auto flex items-center justify-between pt-1">
                                 <span className="text-base font-extrabold text-slate-800">

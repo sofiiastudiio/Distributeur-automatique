@@ -6,6 +6,7 @@ export interface Product {
   description: string;
   ingredients: string;
   nutritional_info: {
+    net_weight: string;
     energy_kcal: number;
     proteins: number;
     carbs: number;

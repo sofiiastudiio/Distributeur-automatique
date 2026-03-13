@@ -748,6 +748,12 @@ export default function MachinePage() {
                               {product.nutritional_info?.net_weight && (
                                 <p className="mb-1 text-left text-xs text-slate-400">
                                   {product.nutritional_info.net_weight}
+                                  {product.nutritional_info.energy_kcal > 0 && (
+                                    <span className="ml-1.5 text-slate-300">·</span>
+                                  )}
+                                  {product.nutritional_info.energy_kcal > 0 && (
+                                    <span className="ml-1.5">{product.nutritional_info.energy_kcal} kcal/{product.nutritional_info.per}</span>
+                                  )}
                                 </p>
                               )}
 

@@ -53,6 +53,9 @@ export default function MachinePage() {
 
   const [pendingProduct, setPendingProduct] = useState<Product | null>(null);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<"cash" | "card">("cash");
+  const [cardTapping, setCardTapping] = useState(false);
+  const [cardTappingProduct, setCardTappingProduct] = useState<Product | null>(null);
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
   const activeSectionIdxRef = useRef(0);
   const isAnimating = useRef(false);
@@ -351,6 +354,20 @@ export default function MachinePage() {
     }
   };
 
+  const dispenseProduct = useCallback((product: Product) => {
+    setDispensing(product.id);
+    setLastDispensed(null);
+    setShowPickup(false);
+    setSelectedLetter(null);
+    setSelectedNumber(null);
+    setTimeout(() => {
+      setDispensing(null);
+      setLastDispensed(product);
+      setShowPickup(true);
+      loadStock();
+    }, 2200);
+  }, [loadStock]);
+
   const handleValidate = () => {
     if (dispensing || pendingProduct || !selectedLetter || selectedNumber === null) return;
     const code = `${selectedLetter}${selectedNumber}`;
@@ -370,24 +387,29 @@ export default function MachinePage() {
       setTimeout(() => { setLcdError(null); setSelectedLetter(null); setSelectedNumber(null); }, 1500);
       return;
     }
+    if (paymentMode === "card") {
+      track("purchase_confirm", { product_id: product.id, category: product.category, metadata: { code, price: product.price, payment_method: "card" } });
+      setCardTappingProduct(product);
+      setCardTapping(true);
+      return;
+    }
     if (credit >= product.price) {
       track("purchase_confirm", { product_id: product.id, category: product.category, metadata: { code, price: product.price } });
       recordPurchase(product);
-      setDispensing(product.id);
-      setLastDispensed(null);
-      setShowPickup(false);
-      setSelectedLetter(null);
-      setSelectedNumber(null);
-      setTimeout(() => {
-        setDispensing(null);
-        setLastDispensed(product);
-        setShowPickup(true);
-        loadStock();
-      }, 2200);
+      dispenseProduct(product);
     } else {
       setPendingProduct(product);
     }
   };
+
+  const handleCardConfirm = useCallback(() => {
+    if (!cardTappingProduct) return;
+    const product = cardTappingProduct;
+    setCardTapping(false);
+    setCardTappingProduct(null);
+    recordPurchase(product);
+    dispenseProduct(product);
+  }, [cardTappingProduct, recordPurchase, dispenseProduct]);
 
   const highlightCode = pendingProduct
     ? `${selectedLetter}${selectedNumber}`
@@ -407,7 +429,9 @@ export default function MachinePage() {
 
   const lcdSubText = pendingProduct
     ? `CHF ${pendingProduct.price.toFixed(2)}${amountNeeded > 0 ? ` — Insérez CHF ${amountNeeded.toFixed(2)}` : ""}`
-    : null;
+    : paymentMode === "card" && !selectedLetter
+      ? "Paiement sans contact"
+      : null;
 
   // ═══ MONEY INSERTION PANEL ═══
   const MoneyInsertPanel = () => (
@@ -475,8 +499,40 @@ export default function MachinePage() {
         )}
       </div>
 
-      {/* Money panel when pending purchase */}
-      {pendingProduct && <MoneyInsertPanel />}
+      {/* Payment mode toggle — only before first purchase */}
+      {amountSpent === 0 && !moneyInserted && (
+        <div className={`flex rounded-xl bg-slate-200/70 p-1 gap-1 ${compact ? "" : ""}`}>
+          <button
+            onClick={() => setPaymentMode("cash")}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all ${
+              paymentMode === "cash"
+                ? "bg-white text-amber-700 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="9"/><path d="M12 6v2m0 8v2M9 12h6"/>
+            </svg>
+            Espèces
+          </button>
+          <button
+            onClick={() => setPaymentMode("card")}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all ${
+              paymentMode === "card"
+                ? "bg-white text-teal-700 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>
+            </svg>
+            Carte
+          </button>
+        </div>
+      )}
+
+      {/* Money panel when pending purchase (cash only) */}
+      {pendingProduct && paymentMode === "cash" && <MoneyInsertPanel />}
 
       {/* Letter buttons */}
       <div>
@@ -532,9 +588,16 @@ export default function MachinePage() {
         <button
           onClick={handleValidate}
           disabled={!!dispensing || !!pendingProduct || !selectedLetter || selectedNumber === null}
-          className={`flex ${compact ? "h-10" : "h-12"} items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 font-semibold text-white text-sm shadow-md shadow-teal-500/25 transition-all duration-150 hover:shadow-lg hover:shadow-teal-500/30 active:translate-y-0.5 active:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed`}
+          className={`flex ${compact ? "h-10" : "h-12"} items-center justify-center gap-1.5 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 font-semibold text-white text-sm shadow-md shadow-teal-500/25 transition-all duration-150 hover:shadow-lg hover:shadow-teal-500/30 active:translate-y-0.5 active:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed`}
         >
-          Valider
+          {paymentMode === "card" ? (
+            <>
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>
+              </svg>
+              Payer
+            </>
+          ) : "Valider"}
         </button>
       </div>
 
@@ -584,8 +647,8 @@ export default function MachinePage() {
             </div>
 
             <div className="flex items-center gap-3 lg:gap-5">
-              {/* Distributor selector — only before money is inserted */}
-              {!moneyInserted && (
+              {/* Distributor selector — only before session is started */}
+              {!moneyInserted && amountSpent === 0 && (
                 <select
                   value={distributorId}
                   onChange={async (e) => {
@@ -610,14 +673,29 @@ export default function MachinePage() {
               )}
 
               <div className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-slate-50 to-teal-50/50 px-3 py-2 ring-1 ring-slate-200/60 lg:gap-3 lg:px-5 lg:py-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-teal-400 to-emerald-500 shadow-md shadow-teal-500/20 lg:h-9 lg:w-9">
-                  <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                  </svg>
+                <div className={`flex h-8 w-8 items-center justify-center rounded-xl shadow-md lg:h-9 lg:w-9 ${paymentMode === "card" ? "bg-gradient-to-br from-violet-500 to-indigo-600 shadow-violet-500/20" : "bg-gradient-to-br from-teal-400 to-emerald-500 shadow-teal-500/20"}`}>
+                  {paymentMode === "card" ? (
+                    <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>
+                    </svg>
+                  ) : (
+                    <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                    </svg>
+                  )}
                 </div>
                 <div>
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Crédit</p>
-                  <p className="text-base font-extrabold text-slate-800 lg:text-lg">CHF <span className="text-teal-600">{credit.toFixed(2)}</span></p>
+                  {paymentMode === "card" ? (
+                    <>
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Paiement</p>
+                      <p className="text-base font-extrabold text-violet-600 lg:text-lg">Carte</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Crédit</p>
+                      <p className="text-base font-extrabold text-slate-800 lg:text-lg">CHF <span className="text-teal-600">{credit.toFixed(2)}</span></p>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="hidden flex-col items-center gap-1.5 sm:flex">
@@ -836,6 +914,45 @@ export default function MachinePage() {
           </div>
         </div>
 
+        {/* ═══ CARD TAP OVERLAY ═══ */}
+        {cardTapping && cardTappingProduct && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]" />
+            <div className="relative z-10 m-4 w-full max-w-sm animate-[slideUp_0.3s_ease-out] rounded-3xl bg-white p-8 shadow-2xl text-center">
+              <p className="mb-1 text-xs font-bold uppercase tracking-widest text-violet-400">Paiement sans contact</p>
+              <h3 className="mb-1 text-base font-bold text-slate-800">{cardTappingProduct.name}</h3>
+              <p className="mb-6 text-2xl font-extrabold text-slate-900">CHF {cardTappingProduct.price.toFixed(2)}</p>
+
+              {/* NFC animation */}
+              <div className="relative mx-auto mb-6 flex h-28 w-28 items-center justify-center">
+                <span className="absolute inset-0 animate-ping rounded-full bg-violet-400/20" style={{ animationDuration: "1.2s" }} />
+                <span className="absolute inset-3 animate-ping rounded-full bg-violet-400/20" style={{ animationDuration: "1.2s", animationDelay: "0.3s" }} />
+                <span className="absolute inset-6 animate-ping rounded-full bg-violet-400/20" style={{ animationDuration: "1.2s", animationDelay: "0.6s" }} />
+                <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-500/30">
+                  <svg className="h-8 w-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 7a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.664.89l.812 1.22A2 2 0 0 0 12.07 12H20z"/><path d="M14 12h.01M17 12h.01"/>
+                  </svg>
+                </div>
+              </div>
+
+              <p className="mb-6 text-sm font-semibold text-slate-500">Approchez votre carte ou téléphone</p>
+
+              <button
+                onClick={handleCardConfirm}
+                className="w-full rounded-2xl bg-gradient-to-r from-violet-500 to-indigo-600 py-4 text-sm font-bold text-white shadow-md shadow-violet-500/25 transition-all active:scale-95"
+              >
+                Confirmer le paiement
+              </button>
+              <button
+                onClick={() => { setCardTapping(false); setCardTappingProduct(null); }}
+                className="mt-2 w-full py-2 text-xs text-slate-400 hover:text-slate-600"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ═══ PICKUP OVERLAY ═══ */}
         {showPickup && lastDispensed && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
@@ -885,7 +1002,7 @@ export default function MachinePage() {
             />
             <div className="relative z-10 m-4 w-full max-w-sm animate-[slideUp_0.4s_ease-out] rounded-3xl bg-white p-6 shadow-2xl">
               <h3 className="text-center text-lg font-bold text-slate-800">Terminer vos achats ?</h3>
-              {credit > 0 && (
+              {paymentMode === "cash" && credit > 0 && (
                 <p className="mt-2 text-center text-sm text-slate-500">
                   Votre monnaie de <span className="font-bold text-teal-600">CHF {credit.toFixed(2)}</span> vous sera rendue.
                 </p>

@@ -54,6 +54,8 @@ export default function MachinePage() {
   const [pendingProduct, setPendingProduct] = useState<Product | null>(null);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
   const [paymentMode, setPaymentMode] = useState<"cash" | "card">("cash");
+  const [showPaymentChoice, setShowPaymentChoice] = useState(false);
+  const [paymentChoiceProduct, setPaymentChoiceProduct] = useState<Product | null>(null);
   const [cardTapping, setCardTapping] = useState(false);
   const [cardTappingProduct, setCardTappingProduct] = useState<Product | null>(null);
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
@@ -387,18 +389,28 @@ export default function MachinePage() {
       setTimeout(() => { setLcdError(null); setSelectedLetter(null); setSelectedNumber(null); }, 1500);
       return;
     }
-    if (paymentMode === "card") {
-      track("purchase_confirm", { product_id: product.id, category: product.category, metadata: { code, price: product.price, payment_method: "card" } });
+    setPaymentChoiceProduct(product);
+    setShowPaymentChoice(true);
+  };
+
+  const handlePaymentChoice = (mode: "cash" | "card") => {
+    const product = paymentChoiceProduct;
+    if (!product) return;
+    setShowPaymentChoice(false);
+    setPaymentChoiceProduct(null);
+    setPaymentMode(mode);
+    if (mode === "card") {
+      track("purchase_confirm", { product_id: product.id, category: product.category, metadata: { code: `${selectedLetter}${selectedNumber}`, price: product.price, payment_method: "card" } });
       setCardTappingProduct(product);
       setCardTapping(true);
-      return;
-    }
-    if (credit >= product.price) {
-      track("purchase_confirm", { product_id: product.id, category: product.category, metadata: { code, price: product.price } });
-      recordPurchase(product);
-      dispenseProduct(product);
     } else {
-      setPendingProduct(product);
+      if (credit >= product.price) {
+        track("purchase_confirm", { product_id: product.id, category: product.category, metadata: { code: `${selectedLetter}${selectedNumber}`, price: product.price } });
+        recordPurchase(product);
+        dispenseProduct(product);
+      } else {
+        setPendingProduct(product);
+      }
     }
   };
 
@@ -499,40 +511,8 @@ export default function MachinePage() {
         )}
       </div>
 
-      {/* Payment mode toggle — only before first purchase */}
-      {amountSpent === 0 && !moneyInserted && (
-        <div className={`flex rounded-xl bg-slate-200/70 p-1 gap-1 ${compact ? "" : ""}`}>
-          <button
-            onClick={() => setPaymentMode("cash")}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all ${
-              paymentMode === "cash"
-                ? "bg-white text-amber-700 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="9"/><path d="M12 6v2m0 8v2M9 12h6"/>
-            </svg>
-            Espèces
-          </button>
-          <button
-            onClick={() => setPaymentMode("card")}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all ${
-              paymentMode === "card"
-                ? "bg-white text-teal-700 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>
-            </svg>
-            Carte
-          </button>
-        </div>
-      )}
-
-      {/* Money panel when pending purchase (cash only) */}
-      {pendingProduct && paymentMode === "cash" && <MoneyInsertPanel />}
+      {/* Money panel when pending purchase */}
+      {pendingProduct && <MoneyInsertPanel />}
 
       {/* Letter buttons */}
       <div>
@@ -647,8 +627,8 @@ export default function MachinePage() {
             </div>
 
             <div className="flex items-center gap-3 lg:gap-5">
-              {/* Distributor selector — only before session is started */}
-              {!moneyInserted && amountSpent === 0 && (
+              {/* Distributor selector — only before money is inserted */}
+              {!moneyInserted && (
                 <select
                   value={distributorId}
                   onChange={async (e) => {
@@ -913,6 +893,50 @@ export default function MachinePage() {
             </div>
           </div>
         </div>
+
+        {/* ═══ PAYMENT CHOICE MODAL ═══ */}
+        {showPaymentChoice && paymentChoiceProduct && (
+          <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
+            <div
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
+              onClick={() => { setShowPaymentChoice(false); setPaymentChoiceProduct(null); }}
+            />
+            <div className="relative z-10 m-4 w-full max-w-sm animate-[slideUp_0.3s_ease-out] rounded-3xl bg-white p-6 shadow-2xl">
+              <h3 className="text-center text-base font-bold text-slate-800">Comment souhaitez-vous payer ?</h3>
+              <p className="mt-1 text-center text-sm text-slate-500">
+                {paymentChoiceProduct.name} — <span className="font-semibold text-slate-700">CHF {paymentChoiceProduct.price.toFixed(2)}</span>
+              </p>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => handlePaymentChoice("cash")}
+                  className="flex flex-col items-center gap-2 rounded-2xl border-2 border-amber-200 bg-amber-50 py-5 transition-all hover:border-amber-400 hover:bg-amber-100 active:scale-95"
+                >
+                  <svg className="h-7 w-7 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="6" width="20" height="12" rx="2"/>
+                    <circle cx="12" cy="12" r="2"/>
+                    <path d="M6 12h.01M18 12h.01"/>
+                  </svg>
+                  <span className="text-sm font-bold text-amber-700">Espèces</span>
+                </button>
+                <button
+                  onClick={() => handlePaymentChoice("card")}
+                  className="flex flex-col items-center gap-2 rounded-2xl border-2 border-violet-200 bg-violet-50 py-5 transition-all hover:border-violet-400 hover:bg-violet-100 active:scale-95"
+                >
+                  <svg className="h-7 w-7 text-violet-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>
+                  </svg>
+                  <span className="text-sm font-bold text-violet-700">Carte</span>
+                </button>
+              </div>
+              <button
+                onClick={() => { setShowPaymentChoice(false); setPaymentChoiceProduct(null); }}
+                className="mt-3 w-full py-2 text-xs text-slate-400 hover:text-slate-600"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ═══ CARD TAP OVERLAY ═══ */}
         {cardTapping && cardTappingProduct && (

@@ -104,8 +104,8 @@ export async function GET() {
     }
   }
 
-  // Recent sessions (last 20)
-  const recentSessions = sessions.slice(0, 20).map((s) => ({
+  // All sessions
+  const recentSessions = sessions.map((s) => ({
     id: s.id,
     participant: s.participant?.name || "Anonyme",
     budget: s.budget_set,

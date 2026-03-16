@@ -71,7 +71,11 @@ export type EventType =
   | "session_start"
   | "session_end"
   | "feedback_submit"
-  | "money_insert";
+  | "money_insert"
+  | "allergen_filter_toggle"
+  | "allergen_filter_clear"
+  | "allergen_warning_shown"
+  | "allergen_warning_override";
 
 export interface TrackedEvent {
   session_id: number;

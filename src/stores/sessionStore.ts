@@ -10,10 +10,12 @@ interface SessionState {
   amountSpent: number;
   status: "idle" | "active" | "completed";
   moneyInserted: boolean;
+  selectedAllergens: string[];
   setSession: (sessionId: number, participantId: number, distributorId?: string) => void;
   setDistributor: (id: string) => void;
   insertMoney: (amount: number) => Promise<void>;
   addSpending: (amount: number) => void;
+  toggleAllergen: (id: string) => void;
   remaining: () => number;
   reset: () => void;
 }
@@ -26,6 +28,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   amountSpent: 0,
   status: "idle",
   moneyInserted: false,
+  selectedAllergens: [],
 
   setSession: (sessionId, participantId, distributorId = "SAFEBOX-A") =>
     set({ sessionId, participantId, distributorId, budget: 0, amountSpent: 0, status: "active", moneyInserted: false }),
@@ -49,6 +52,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   addSpending: (amount) =>
     set((state) => ({ amountSpent: state.amountSpent + amount })),
 
+  toggleAllergen: (id) =>
+    set((state) => ({
+      selectedAllergens: state.selectedAllergens.includes(id)
+        ? state.selectedAllergens.filter((a) => a !== id)
+        : [...state.selectedAllergens, id],
+    })),
+
   remaining: () => {
     const state = get();
     return Math.max(0, state.budget - state.amountSpent);
@@ -63,5 +73,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       amountSpent: 0,
       status: "idle",
       moneyInserted: false,
+      selectedAllergens: [],
     }),
 }));

@@ -13,6 +13,7 @@ export default function OnboardingPage() {
   const router = useRouter();
   const participantId = useSessionStore((s) => s.participantId);
   const distributorId = useSessionStore((s) => s.distributorId);
+  const selectedAllergens = useSessionStore((s) => s.selectedAllergens);
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -20,7 +21,7 @@ export default function OnboardingPage() {
   const [form, setForm] = useState({
     age_range: "",
     gender: "",
-    allergies: [] as string[],
+    allergies: [...selectedAllergens],
   });
 
   const toggleArray = (arr: string[], val: string) =>

@@ -7,7 +7,7 @@ import { QRCodeSVG } from "qrcode.react";
 import type { Product } from "@/types";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useEventTracker } from "@/hooks/useEventTracker";
-import { DENOMINATIONS } from "@/lib/constants";
+import { DENOMINATIONS, ALLERGENS } from "@/lib/constants";
 
 function SafeBoxLogo({ size = 44 }: { size?: number }) {
   return (
@@ -58,6 +58,7 @@ export default function MachinePage() {
   const [paymentChoiceProduct, setPaymentChoiceProduct] = useState<Product | null>(null);
   const [cardTapping, setCardTapping] = useState(false);
   const [cardTappingProduct, setCardTappingProduct] = useState<Product | null>(null);
+  const [allergenWarning, setAllergenWarning] = useState<Product | null>(null);
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
   const activeSectionIdxRef = useRef(0);
   const isAnimating = useRef(false);
@@ -78,10 +79,18 @@ export default function MachinePage() {
   const insertMoney = useSessionStore((s) => s.insertMoney);
   const addSpending = useSessionStore((s) => s.addSpending);
   const budget = useSessionStore((s) => s.budget);
+  const selectedAllergens = useSessionStore((s) => s.selectedAllergens);
+  const toggleAllergen = useSessionStore((s) => s.toggleAllergen);
   const amountSpent = useSessionStore((s) => s.amountSpent);
   const { track, flush } = useEventTracker();
 
   const credit = budget - amountSpent;
+
+  /** Returns true if the product contains any of the user's selected allergens */
+  const productHasAllergen = useCallback((product: Product) => {
+    if (selectedAllergens.length === 0) return false;
+    return selectedAllergens.some((a) => !product.allergen_free.includes(a));
+  }, [selectedAllergens]);
   const amountNeeded = pendingProduct ? Math.max(0, pendingProduct.price - credit) : 0;
 
   const loadStock = useCallback(() => {
@@ -293,6 +302,11 @@ export default function MachinePage() {
   const handleProductClick = (sectionPrefix: string, idx: number, product: Product) => {
     if (dispensing || pendingProduct) return;
     if (stockMap[product.id] === 0) return;
+    if (productHasAllergen(product)) {
+      track("allergen_warning_shown", { product_id: product.id, metadata: { allergens: selectedAllergens.filter((a) => !product.allergen_free.includes(a)) } });
+      setAllergenWarning(product);
+      return;
+    }
     const letter = sectionPrefix;
     const num = idx + 1;
     setLcdError(null);
@@ -387,6 +401,11 @@ export default function MachinePage() {
     if (stockMap[product.id] === 0) {
       setLcdError("Épuisé");
       setTimeout(() => { setLcdError(null); setSelectedLetter(null); setSelectedNumber(null); }, 1500);
+      return;
+    }
+    if (productHasAllergen(product)) {
+      track("allergen_warning_shown", { product_id: product.id, metadata: { allergens: selectedAllergens.filter((a) => !product.allergen_free.includes(a)) } });
+      setAllergenWarning(product);
       return;
     }
     setPaymentChoiceProduct(product);
@@ -600,6 +619,51 @@ export default function MachinePage() {
           Terminer mes achats
         </button>
       )}
+
+      {/* Allergen filter */}
+      <div className="rounded-xl bg-amber-50/80 p-3 ring-1 ring-amber-200/40">
+        <div className="mb-2 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <svg className="h-3.5 w-3.5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            </svg>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Mes allergies</span>
+          </div>
+          {selectedAllergens.length > 0 && (
+            <button
+              onClick={() => {
+                selectedAllergens.forEach((a) => toggleAllergen(a));
+                track("allergen_filter_clear", {});
+              }}
+              className="text-[10px] font-bold text-amber-400 hover:text-amber-600"
+            >
+              Effacer
+            </button>
+          )}
+        </div>
+        <div className={`flex flex-wrap ${compact ? "gap-1" : "gap-1.5"}`}>
+          {ALLERGENS.map((a) => {
+            const isActive = selectedAllergens.includes(a.id);
+            return (
+              <button
+                key={a.id}
+                onClick={() => {
+                  toggleAllergen(a.id);
+                  track("allergen_filter_toggle", { metadata: { allergen: a.id, active: !isActive } });
+                }}
+                className={`flex items-center gap-1 rounded-full ${compact ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-[11px]"} font-semibold transition-all ${
+                  isActive
+                    ? "bg-amber-500 text-white shadow-sm shadow-amber-500/25"
+                    : "bg-white text-slate-500 ring-1 ring-slate-200/80 hover:bg-amber-50"
+                }`}
+              >
+                <span className={compact ? "text-[10px]" : "text-xs"}>{a.icon}</span>
+                {a.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </>
   );
 
@@ -730,6 +794,7 @@ export default function MachinePage() {
                         const isHighlighted = highlightCode === slotCode;
                         const stock = stockMap[product.id] ?? null;
                         const isOutOfStock = stock !== null && stock === 0;
+                        const hasAllergen = productHasAllergen(product);
 
                         return (
                           <div
@@ -738,11 +803,15 @@ export default function MachinePage() {
                             className={`relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-[0_2px_16px_rgba(0,0,0,0.06)] ring-1 transition-all duration-300 ${
                               isOutOfStock
                                 ? "opacity-50 cursor-not-allowed grayscale"
-                                : "cursor-pointer hover:shadow-lg active:scale-[0.98]"
+                                : hasAllergen
+                                  ? "opacity-40 grayscale cursor-pointer"
+                                  : "cursor-pointer hover:shadow-lg active:scale-[0.98]"
                             } ${
                               isHighlighted
                                 ? "ring-2 ring-teal-400 shadow-[0_0_20px_rgba(20,184,166,0.3)]"
-                                : "ring-black/[0.03] hover:ring-teal-200"
+                                : hasAllergen
+                                  ? "ring-amber-300/50"
+                                  : "ring-black/[0.03] hover:ring-teal-200"
                             }`}
                           >
                             {/* Slot code */}
@@ -761,7 +830,7 @@ export default function MachinePage() {
                                 />
                               </div>
                               <span className="text-[8px] font-bold text-teal-100 tracking-wide uppercase leading-tight">
-                                📱 Scanner
+                                📱 Plus d&apos;info
                               </span>
                             </div>
 
@@ -836,7 +905,7 @@ export default function MachinePage() {
           </div>
 
           {/* ── Right: Keypad Panel (DESKTOP) ── */}
-          <div className="hidden w-[300px] shrink-0 border-l border-slate-200/60 bg-gradient-to-b from-slate-100 to-slate-200/80 p-5 lg:flex lg:flex-col lg:gap-4 lg:overflow-y-auto">
+          <div className="hidden w-[380px] shrink-0 border-l border-slate-200/60 bg-gradient-to-b from-slate-100 to-slate-200/80 p-5 lg:flex lg:flex-col lg:gap-4 lg:overflow-y-auto">
             <KeypadContent />
           </div>
         </div>
@@ -1018,6 +1087,70 @@ export default function MachinePage() {
         )}
 
         {/* ═══ FINISH CONFIRMATION MODAL ═══ */}
+        {/* ═══ ALLERGEN WARNING MODAL ═══ */}
+        {allergenWarning && (
+          <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
+            <div
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
+              onClick={() => setAllergenWarning(null)}
+            />
+            <div className="relative z-10 m-4 w-full max-w-sm animate-[slideUp_0.3s_ease-out] rounded-3xl bg-white p-6 shadow-2xl">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-100">
+                <svg className="h-7 w-7 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                </svg>
+              </div>
+              <h3 className="text-center text-base font-bold text-slate-800">Attention — Allergène détecté</h3>
+              <p className="mt-2 text-center text-sm text-slate-500">
+                <span className="font-semibold text-slate-700">{allergenWarning.name}</span> contient :
+              </p>
+              <div className="mt-2 flex flex-wrap justify-center gap-1.5">
+                {selectedAllergens
+                  .filter((a) => !allergenWarning.allergen_free.includes(a))
+                  .map((a) => {
+                    const info = ALLERGENS.find((al) => al.id === a);
+                    return info ? (
+                      <span key={a} className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                        {info.icon} {info.label}
+                      </span>
+                    ) : null;
+                  })}
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setAllergenWarning(null)}
+                  className="rounded-2xl bg-slate-100 py-3 text-sm font-semibold text-slate-600 transition-all hover:bg-slate-200 active:scale-95"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={() => {
+                    const product = allergenWarning;
+                    setAllergenWarning(null);
+                    track("allergen_warning_override", { product_id: product.id, metadata: { allergens: selectedAllergens.filter((a) => !product.allergen_free.includes(a)) } });
+                    // Find section and index for this product
+                    const section = SECTIONS.find((s) => s.key === product.category);
+                    if (!section) return;
+                    const sectionProducts = products.filter((p) => p.category === section.key);
+                    const idx = sectionProducts.findIndex((p) => p.id === product.id);
+                    if (idx === -1) return;
+                    const letter = section.prefix;
+                    const num = idx + 1;
+                    setLcdError(null);
+                    setSelectedLetter(letter);
+                    setSelectedNumber(num);
+                    setPaymentChoiceProduct(product);
+                    setShowPaymentChoice(true);
+                  }}
+                  className="rounded-2xl bg-amber-500 py-3 text-sm font-bold text-white shadow-md shadow-amber-500/25 transition-all active:scale-95"
+                >
+                  Acheter quand même
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {showFinishConfirm && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center">
             <div

@@ -830,7 +830,7 @@ export default function MachinePage() {
                                 />
                               </div>
                               <span className="text-[8px] font-bold text-teal-100 tracking-wide uppercase leading-tight">
-                                📱 Plus d&apos;info
+                                📱 Plus d&apos;infos
                               </span>
                             </div>
 
